@@ -1,0 +1,26 @@
+    ____                  _____ ___    ______                            
+   / __ )____ ___  _____ / ___//   |  / ____/                            
+  / __  / __ `/ / / / _ \\__ \/ /| | / /_                             
+ / /_/ / /_/ / /_/ /  __/__/ / ___ |/ __/                                
+/_____/\__,_/\__, /\___/____/_/  |_/_/                                
+            /____/                                                       
+
+-----------------------------------------------------------------------  
+Contributors/Copyright                                                   
+2024 Jacopo Liberatori, jacopo.liberatori@uniroma1.it                    
+2024 Davide Cavalieri,  davide.cavalieri@uniroma1.it                     
+Department of Mechanical and Aerospace Engineering (DIMA)                
+Sapienza University of Rome                                              
+-----------------------------------------------------------------------  
+
++++++ MAP surrogate for Jet C-1 POSF-11498 +++++
+Number of MAP components: 2
+MAP hydrocarbon classes: isoparaffins, isoparaffins
+MAP hydrocarbons: 2,2,5,5-tetramethyl-3-ethylhexane, 2,2,4,4,6,8,8-heptamethylnonane
+MAP molecular weight: 180.436 g/mol
+MAP molecular formula: C12.72 H27.44
+MAP hydrogen-to-carbon ratio: 2.157
+MAP molar fractions: 0.82003     0.17997
+MAP mass fractions: 0.77413     0.22587
+MAP carbon atoms: 12  16
+MAP topochemical atom indices: 0.76671           1
