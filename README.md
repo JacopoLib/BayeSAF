@@ -30,4 +30,6 @@ The _BayeSAF_ framework constitutes a robust methodology for carrying out altern
 
 # Example end-to-end application
 
+Deep learning-based forward UQ on Bayes-informed sustainable aviation fuel surrogates: a case study on bio-jet fuel vaporization
+
 ![BayeSAF application](img/end_to_end.png)
