@@ -34,7 +34,7 @@ Deep learning-based forward UQ on Bayes-informed sustainable aviation fuel surro
 
 ![BayeSAF application](img/end_to_end.png)
 
-# REFERENCE
+# Reference
 
 Liberatori J., Cavalieri D., Blandino M., Valorani M., and Ciottoli P.P., _BayeSAF: Emulation and Design of Sustainable Alternative Fuels via Bayesian Inference and Descriptors-Based Machine Learning_, Fuel (under review), 2025, https://doi.org/10.2139/ssrn.5049145.
 
