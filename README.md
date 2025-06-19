@@ -34,7 +34,7 @@ Deep learning-based forward UQ on Bayes-informed sustainable aviation fuel surro
 
 ![BayeSAF application](img/end_to_end.png)
 
-# Reference
+# How to cite
 
 Liberatori J., Cavalieri D., Blandino M., Valorani M., and Ciottoli P.P., _BayeSAF: Emulation and Design of Sustainable Alternative Fuels via Bayesian Inference and Descriptors-Based Machine Learning_, Fuel (under review), 2025, https://doi.org/10.2139/ssrn.5049145.
 
@@ -47,3 +47,6 @@ Liberatori J., Cavalieri D., Blandino M., Valorani M., and Ciottoli P.P., _BayeS
   doi          = {10.2139/ssrn.5049145}
 }
 ```
+Copyright (C) 2025 Jacopo Liberatori - All Rights Reserved.
+
+You may use, distribute and modify this code under the terms of the MIT license.
