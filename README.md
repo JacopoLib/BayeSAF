@@ -47,4 +47,4 @@ Liberatori J., Cavalieri D., Blandino M., Valorani M., and Ciottoli P.P., _BayeS
   doi          = {10.2139/ssrn.5049145}
 }
 ```
-Copyright (C) 2025 Jacopo Liberatori - All Rights Reserved. You may use, distribute and modify this code under the terms of the MIT license.
+Copyright (C) 2025 Jacopo Liberatori - All Rights Reserved. You may use, distribute and modify this code under the terms of Prosperity Public License.
