@@ -1,0 +1,13 @@
+Name;SMILES
+indane;C1=CC2=C(C=C1)CCC2
+1,2,3,4-tetrahydronaphthalene;C1=CC2=C(C=C1)CCCC2
+1-methyl-[1,2,3,4-tetrahydronaphthalene];CC1CCCC2=C1C=CC=C2
+2-methyl-[1,2,3,4-tetrahydronaphthalene];CC1CCC2=C(C=CC=C2)C1
+1-ethyl-[1,2,3,4-tetrahydronaphthalene];CCC1CCCC2=C1C=CC=C2
+2-ethyl-[1,2,3,4-tetrahydronaphthalene];CCC1CCC2=C(C=CC=C2)C1
+2-propyl-[1,2,3,4-tetrahydronaphthalene];CCCC1CCC2=C(C=CC=C2)C1
+1-propyl-[1,2,3,4-tetrahydronaphthalene];CCCC1CCCC2=C1C=CC=C2
+2-butyl-[1,2,3,4-tetrahydronaphthalene];CCCCC1CCC2=C(C=CC=C2)C1
+1-butyl-[1,2,3,4-tetrahydronaphthalene];CCCCC1CCCC2=C1C=CC=C2
+1-pentyl-[1,2,3,4-tetrahydronaphthalene];CCCCCC1CCCC2=C1C=CC=C2
+2-pentyl-[1,2,3,4-tetrahydronaphthalene];CCCCCC1CCC2=C(C=CC=C2)C1

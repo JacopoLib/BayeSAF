@@ -1,0 +1,37 @@
+Name;SMILES
+benzene;C1=CC=CC=C1
+toluene;CC1=CC=CC=C1
+ethylbenzene ;CCC1=CC=CC=C1
+m-xylene ;CC1=CC=CC(C)=C1
+o-xylene ;CC1=C(C)C=CC=C1
+p-xylene ;CC1=CC=C(C)C=C1
+cumene;CC(C)C1=CC=CC=C1
+p-ethyltoluene ;CCC1=CC=C(C)C=C1
+m-ethyltoluene ;CCC1=CC(C)=CC=C1
+o-ethyltoluene ;CCC1=C(C)C=CC=C1
+mesitylene ;CC1=CC(C)=CC(C)=C1
+propylbenzene;CCCC1=CC=CC=C1
+1,2,3-trimethylbenzene;CC1=CC=CC(C)=C1C
+1,2,4-trimethylbenzene;CC1=CC(C)=C(C)C=C1
+tert-butylbenzene;CC(C)(C)C1=CC=CC=C1
+sec-butylbenzene;CCC(C)C1=CC=CC=C1
+butylbenzene;CCCCC1=CC=CC=C1
+m-cymene;CC1=CC=CC(C(C)C)=C1
+p-cymene;CC1=CC=C(C(C)C)C=C1
+o-cymene;CC1=C(C(C)C)C=CC=C1
+m-diethylbenzene;CCC1=CC=CC(CC)=C1
+o-diethylbenzene;CCC1=C(CC)C=CC=C1
+p-diethylbenzene;CCC1=CC=C(CC)C=C1
+5-ethyl-m-xylene;CCC1=CC(C)=CC(C)=C1
+4-ethyl-m-xylene;CCC1=C(C)C=C(C)C=C1
+2-ethyl-m-xylene;CCC1=C(C)C=CC=C1C
+4-ethyl-o-xylene;CCC1=CC(C)=C(C)C=C1
+3-ethyl-o-xylene;CCC1=C(C)C(C)=CC=C1
+2-ethyl-p-xylene;CCC1=C(C)C=CC(C)=C1
+isobutylbenzene;CC(C)CC1=CC=CC=C1
+1-methyl-2-propylbenzene;CCCC1=C(C)C=CC=C1
+1-methyl-3-propylbenzene;CCCC1=CC(C)=CC=C1
+1-methyl-4-propylbenzene;CCCC1=CC=C(C)C=C1
+1,2,3,5-tetramethylbenzene;CC1=CC(C)=C(C)C(C)=C1
+1,2,4,5-tetramethylbenzene;CC1=CC(C)=C(C)C=C1C
+1,2,3,4-tetramethylbenzene;CC1=C(C)C(C)=C(C)C=C1

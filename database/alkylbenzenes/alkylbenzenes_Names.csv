@@ -1,0 +1,37 @@
+Name;eta_B_star;eta_B_star_norm
+benzene;0.00000;1.00000000
+toluene;1.52384;1.00000000
+ethylbenzene ;0.99965;0.00000000
+m-xylene ;3.11428;1.00000000
+o-xylene ;2.86798;0.88352659
+p-xylene ;3.11395;0.99984312
+cumene;2.91747;0.50902812
+p-ethyltoluene ;2.60013;0.42403274
+m-ethyltoluene ;2.59989;0.42396854
+o-ethyltoluene ;2.34927;0.35684480
+mesitylene ;4.75060;1.00000000
+propylbenzene;1.01693;0.00000000
+1,2,3-trimethylbenzene;4.24699;0.86511703
+1,2,4-trimethylbenzene;4.50009;0.93290411
+tert-butylbenzene;5.96644;1.00000000
+sec-butylbenzene;2.38308;0.27381358
+butylbenzene;1.03195;0.00000000
+m-cymene;4.56041;0.71506098
+p-cymene;4.56054;0.71508696
+o-cymene;4.30459;0.66321725
+m-diethylbenzene;2.05983;0.20830447
+o-diethylbenzene;1.80659;0.15698455
+p-diethylbenzene;2.05974;0.20828652
+5-ethyl-m-xylene;4.23982;0.65009176
+4-ethyl-m-xylene;3.98393;0.59823457
+2-ethyl-m-xylene;3.72977;0.54672824
+4-ethyl-o-xylene;3.98438;0.59832538
+3-ethyl-o-xylene;3.72886;0.54654256
+2-ethyl-p-xylene;3.98386;0.59821921
+isobutylbenzene;3.21045;0.44148417
+1-methyl-2-propylbenzene;2.38056;0.27330209
+1-methyl-3-propylbenzene;2.63454;0.32477385
+1-methyl-4-propylbenzene;2.63476;0.32481844
+1,2,3,5-tetramethylbenzene;5.90752;0.98805988
+1,2,4,5-tetramethylbenzene;5.90926;0.98841150
+1,2,3,4-tetramethylbenzene;5.64914;0.93569836
