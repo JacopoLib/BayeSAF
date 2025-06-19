@@ -22,7 +22,7 @@ Setting informative prior probability density functions (PDFs) for the compositi
 
 **<u>OUTPUT<u>**
 
-On the one hand, the primary outcome of the _BayeSAF_ algorithm is the most probable surrogate mixture composition in terms of molar proportions, carbon atom counts, and isomeric conformations, also referred to as the \textit{maximum-a-posteriori} (MAP) surrogate mixture. On the other hand, as the posterior PDF inherently provides a statistical description of the surrogate composition, a variance-based global sensitivity analysis (GSA) about the impact of individual groups of compositional parameters on the variance in key physicochemical properties might be carried out by resorting to grouped first-order Sobol' indices.
+On the one hand, the primary outcome of the _BayeSAF_ algorithm is the most probable surrogate mixture composition in terms of molar proportions, carbon atom counts, and isomeric conformations, also referred to as the _maximum-a-posteriori_ (MAP) surrogate mixture. On the other hand, as the posterior PDF inherently provides a statistical description of the surrogate composition, a variance-based global sensitivity analysis (GSA) about the impact of individual groups of compositional parameters on the variance in key physicochemical properties might be carried out by resorting to grouped first-order Sobol' indices.
 
 # Objectives
 
