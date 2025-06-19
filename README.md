@@ -11,4 +11,5 @@
 (iii) corresponding hydrocarbon molecular groups, ℋ
 
 **What is _BayeSAF_ inferring then?**
+
 _BayeSAF_ infers **λ** = [**X**; **n<sub>C</sub>**; **η<sub>Β</sub><sup>*</sup>**], i.e., a set of (3N<sub>s</sub>-1) compositional parameters - molar fractions, carbon atom counts, and normalized topochemical atom indices for branching - that univocally identifies mixtures comprising chemical compounds from the hydrocarbon property database. 
