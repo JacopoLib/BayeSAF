@@ -30,4 +30,4 @@ The _BayeSAF_ framework constitutes a robust methodology for carrying out altern
 
 # Example end-to-end application
 
-
+![BayeSAF application](img/end_to_end.png)
