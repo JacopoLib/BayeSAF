@@ -33,3 +33,17 @@ The _BayeSAF_ framework constitutes a robust methodology for carrying out altern
 Deep learning-based forward UQ on Bayes-informed sustainable aviation fuel surrogates: a case study on bio-jet fuel vaporization.
 
 ![BayeSAF application](img/end_to_end.png)
+
+# REFERENCE
+
+Liberatori J., Cavalieri D., Blandino M., Valorani M., and Ciottoli P.P., _BayeSAF: Emulation and Design of Sustainable Alternative Fuels via Bayesian Inference and Descriptors-Based Machine Learning_, Fuel (under review), 2025, https://doi.org/10.2139/ssrn.5049145.
+
+```
+@article{liberatori2025bayesaf,
+  author       = {Jacopo Liberatori and Davide Cavalieri and Matteo Blandino and Mauro Valorani and {Pietro Paolo} Ciottoli},
+  title        = {{BayeSAF: Emulation and Design of Sustainable Alternative Fuels via Bayesian Inference and Descriptors-Based Machine Learning}},
+  journal      = {Fuel (under review)},
+  year         = {2024},
+  doi          = {10.2139/ssrn.5049145}
+}
+```
