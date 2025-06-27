@@ -1,5 +1,7 @@
 # BayeSAF: Emulation and Design of Sustainable Alternative Fuels via Bayesian Inference and Descriptors-Based Machine Learning
 
+![BayeSAF logo](img/Logo_BayeSAF.png)
+
 As part of mid-century net-zero carbon neutrality pathways, sustainable aviation fuels (SAFs) constitute the only viable decarbonization strategy for commercial aviation in the foreseeable future. Still, reliable prescreening of alternative jet fuels is crucial in facilitating the de-risking and scale-up of SAF production technologies. In the present study, we illustrate an innovative methodology to support the physicochemical characterization of emerging SAFs and to understand the impact on combustor operability figures of merit (FOM).
 
 ![BayeSAF workflow](img/workflow.png)
