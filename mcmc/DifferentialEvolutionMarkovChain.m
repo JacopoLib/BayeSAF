@@ -156,22 +156,50 @@ x = nan(maxIterations,3*numComponents-1,N_chains); eta_B_star_chain = nan(maxIte
 X = 1e+18*ones(N_chains,3*numComponents-1);     % (N-1) mole fractions + N numbers of carbon atoms + N topochemical atom indices
 
 p_X = nan(N_chains,1);
-lhs = lhsdesign(N_chains, 3*numComponents-1); % generate initial LHS design
+% Constrained Latin hypercube sampling (LHS) to initialize DE-MC chains
+validSamples = [];
+
+while size(validSamples, 1) < N_chains
+    
+    % Oversample
+    lhs = lhsdesign(10*N_chains, 3*numComponents - 1);
+    
+    % === 1. Extract LHS parts ===
+    lhs_x = lhs(:, 1:numComponents-1); % mole fractions
+    lhs_rest = lhs(:, numComponents:end); % number of carbon atoms and normalized topochemical atom indices
+
+    % === 2. Rescale mole fractions ===
+    scaled_x = lhs_x .* (UpperBound_x(1:end-1) - LowerBound_x(1:end-1)) + LowerBound_x(1:end-1);
+
+    % === 3. Apply constraint on sum ===
+    xSum = sum(scaled_x, 2);
+    constraint = (xSum < 1 - LowerBound_x(end)) & (xSum > 1 - UpperBound_x(end));
+
+    % === 4. Retain only valid samples ===
+    valid_x = scaled_x(constraint, :);
+    valid_rest = lhs_rest(constraint, :);
+
+    % === 5. Recombine and store ===
+    validSamples = [validSamples; [valid_x, valid_rest]];
+end
+
+% Trim to the number of DE-MC chains
+lhs_constrained = validSamples(1:N_chains, :);
 
 t = 1; % starting iteration
 
 for i = 1:N_chains
 
     for j = 1:numComponents-1
-        X(i,j) = LowerBound_x(j) + (UpperBound_x(j) - LowerBound_x(j)) * lhs(i,j);
+        X(i,j) = lhs_constrained(i,j);
     end
 
     for k = numComponents:2*numComponents-1
-        X(i,k) = min(n_ranges{k-numComponents+1}) + round((max(n_ranges{k-numComponents+1}) - min(n_ranges{k-numComponents+1})) * lhs(i,k));
+        X(i,k) = min(n_ranges{k-numComponents+1}) + round((max(n_ranges{k-numComponents+1}) - min(n_ranges{k-numComponents+1})) * lhs_constrained(i,k));
     end
 
     for l = 2*numComponents:3*numComponents-1
-        eta_l = LowerBound_eta_B_star(l-2*numComponents+1) + (UpperBound_eta_B_star(l-2*numComponents+1) - LowerBound_eta_B_star(l-2*numComponents+1)) * lhs(i,l);
+        eta_l = LowerBound_eta_B_star(l-2*numComponents+1) + (UpperBound_eta_B_star(l-2*numComponents+1) - LowerBound_eta_B_star(l-2*numComponents+1)) * lhs_constrained(i,l);
         classl = classes{l-2*numComponents+1}; % Pick topochemical atom indices from database displaying the closest value to those sampled
         eta_B_star_norm_list = [classl.eta_B_star_norm];
         eta_B_star_norm_values(i,l-2*numComponents+1) = eta_B_star_norm_list(findIndex_eta(classl, X(i,l-numComponents), eta_l));
