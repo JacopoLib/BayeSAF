@@ -40,21 +40,23 @@ function [x_MAP, nc_MAP, eta_B_star_MAP] = MAPfinder(chain, numComponents)
 % N_chains: number of chains in the DE-MC algorithm  [-]
 
 % Inputs:
-% 1) chain        : (((t_convergence - t_burnin) x N_chains) x 3*Nc-1) array containing the
+% 1) posterior    : (numIterations-t_convergence x N_chains) array containing the posterior density
+% values from each chain in the DE-MC algorithm discarding the burn-in period
+% 2) chain    : (numIterations-t_convergence x 3*Nc x N_chains) array containing the
 % samples from the posterior PDF from each chain in the DE-MC algorithm discarding the burn-in period,
 % concerning the molar fractions, numbers of carbon atoms, and topochemical atom indices
-% 2) numComponents: number of surrogate mixture components  [-]
+% 3) numComponents: number of surrogate mixture components  [-]
 
 % Outputs:
 % 1) x_MAP: molar fractions characterizing the MAP surrogate components
 % 2) nc_MAP: numbers of carbon atoms characterizing the MAP surrogate components
 % 3) eta_B_star_MAP: topochemical atom indices characterizing the MAP surrogate components
 
-max_posterior = mode(chain);
-x_MAP = max_posterior(1:numComponents-1);
+[~, max_posterior_index] = maxk(posterior(:,1), 1);
+x_MAP = chain(max_posterior_index,1:numComponents-1);
 x_MAP = [x_MAP, 1-sum(x_MAP)];
-nc_MAP = max_posterior(numComponents:2*numComponents-1);
+nc_MAP = chain(max_posterior_index,numComponents:2*numComponents-1);
 
-eta_B_star_MAP = max_posterior(2*numComponents:3*numComponents-1);
+eta_B_star_MAP = chain(max_posterior_index,2*numComponents:3*numComponents-1);
 
 end
