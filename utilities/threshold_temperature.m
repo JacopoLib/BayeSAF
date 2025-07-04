@@ -53,7 +53,7 @@ TbMin = 1e+18;
 % Initialize empty cell array to store the classes
 for j = 1:numComponents
     class = Hydrocarbons(families{j}, n_ranges{j});
-    for k = 1:numel(n_ranges{j})
+    for k = 1:numel([class.nC])
         TbMin = min(TbMin, ThermophysicalProperties_SingleLiquid('boilingTemperature', 0, class(k).molWeight, class(k).Tc, class(k).coeffRho(1), class(k).coeffRho(2), class(k).coeffRho(3), class(k).coeffMu(1), class(k).coeffMu(2), class(k).coeffMu(3), class(k).coeffMu(4), class(k).coeffK(1), class(k).coeffK(2), class(k).coeffK(3), class(k).coeffCl(1), class(k).coeffCl(2), class(k).coeffCl(3), class(k).coeffCl(4), class(k).coeffHv(1), class(k).coeffHv(2), class(k).coeffPsat(1), class(k).coeffPsat(2), class(k).coeffPsat(3), class(k).coeffPsat(4), class(k).coeffPsat(5), class(k).coeffSigma(1), class(k).coeffSigma(2), pressure_distillation));
     end
 end
