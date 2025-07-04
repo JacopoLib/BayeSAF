@@ -195,7 +195,9 @@ for i = 1:N_chains
     end
 
     for k = numComponents:2*numComponents-1
-        X(i,k) = min(n_ranges{k-numComponents+1}) + round((max(n_ranges{k-numComponents+1}) - min(n_ranges{k-numComponents+1})) * lhs_constrained(i,k));
+        nC_k = min(n_ranges{k-numComponents+1}) + round((max(n_ranges{k-numComponents+1}) - min(n_ranges{k-numComponents+1})) * lhs_constrained(i,k));
+        [~, idx_neighb] = min(abs(n_ranges{k-numComponents+1} - nC_k));
+        X(i,k) = n_ranges{k-numComponents+1}(idx_neighb);
     end
 
     for l = 2*numComponents:3*numComponents-1
