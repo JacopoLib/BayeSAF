@@ -55,7 +55,7 @@ end
 if alpha <= 0
     error('alpha must be positive.')
 elseif alpha == 1
-    prob = 1;
+    prob = log(1);
 elseif alpha == 2
     prob = log(6) + sum(log(x)) + log(1 - sum(x));
 else
