@@ -56,12 +56,14 @@ function  [prior, likelihood, posterior] = pdf_build(fullData, families, classes
 % 7) UpperBound_x          : (1 x Nc) array, with the i-th element representing the
 % upper bound for the range the mole fraction of the i-th surrogate mixture
 % component can vary within  [-]
-% 8) n_ranges              : (1 x Nc) cell array, with the i-th cell containing the range
+% 8) alpha                 : (1 x Nc) vector of concentration parameters for the Dirichlet
+% distribution of the molar fractions  [-]
+% 9) n_ranges              : (1 x Nc) cell array, with the i-th cell containing the range
 % the number of carbon atoms of the i-th surrogate mixture component can vary within
-% 9) LowerBound_eta_B_star : (1 x Nc) array, with the i-th element representing the
+% 10) LowerBound_eta_B_star: (1 x Nc) array, with the i-th element representing the
 % lower bound for the range the normalized topochemical atom index for the i-th
 % surrogate mixture component can vary within  [-]
-% 10) UpperBound_eta_B_star: (1 x Nc) array, with the i-th element representing the
+% 11) UpperBound_eta_B_star: (1 x Nc) array, with the i-th element representing the
 % upper bound for the range the normalized topochemical atom index for the i-th
 % surrogate mixture component can vary within  [-]
 
@@ -70,19 +72,13 @@ function  [prior, likelihood, posterior] = pdf_build(fullData, families, classes
 % 2) likelihood: function handle for the likelihood distribution
 % 3) posterior: function handle for the posterior distribution
 
-prior_informative_x = @(x)uniform_pdf(x, LowerBound_x, UpperBound_x);
-
-% Set alpha = 1 to get a symmetric Dirichlet distribution
-alpha = 1;
-prior_constraint_x = @(x)dirichlet_pdf(x, alpha, LowerBound_x, UpperBound_x);
-
-prior_x = @(x) prior_informative_x(x) + prior_constraint_x(x);
+prior_informative_x = @(x)dirichlet_pdf(x, alpha, LowerBound_x, UpperBound_x);
 
 prior_informative_eta_B_star = @(eta_B_star)uniform_pdf(eta_B_star, LowerBound_eta_B_star, UpperBound_eta_B_star);
 
 prior_informative_n = @(n) discrete_uniform(n, n_ranges);
 
-prior = @(x, n, eta_B_star) prior_x(x) + prior_informative_n(n) + prior_informative_eta_B_star(eta_B_star);
+prior = @(x, n, eta_B_star) prior_informative_x(x) + prior_informative_n(n) + prior_informative_eta_B_star(eta_B_star);
 
 for i = 1:numel(fullData)
 
