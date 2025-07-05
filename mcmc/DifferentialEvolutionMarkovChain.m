@@ -259,11 +259,12 @@ while ~convergence && t <= maxIterations         % Dynamic part: evolution of N 
             + noise_X*randn(1,numComponents-1);
         for j = numComponents:2*numComponents-1
             Xp(i,j) =  X(i,j) + g*(X(a,j)-X(b,j)) + noise_nc*randn;
-            Xp(i,numComponents:2*numComponents-1) = round(Xp(i,numComponents:2*numComponents-1));
+            nC_j = round(Xp(i,j));
+            [~, idx_neighb] = min(abs(n_ranges{j-numComponents+1} - nC_j));
+            Xp(i,j) = n_ranges{j-numComponents+1}(idx_neighb);
         end
         for k = 2*numComponents:3*numComponents-1
             Xp(i,k) =  X(i,k) + g*(X(a,k)-X(b,k)) + noise_eta*randn;
-            Xp(i,2*numComponents:3*numComponents-1) = Xp(i,2*numComponents:3*numComponents-1);
         end
         
         % Boundary handling for molar fractions by folding the parameter space
@@ -282,11 +283,15 @@ while ~convergence && t <= maxIterations         % Dynamic part: evolution of N 
         for j = numComponents:2*numComponents-1
             if Xp(i,j) < min(n_ranges{j-numComponents+1})
                 dist = min(n_ranges{j-numComponents+1}) - Xp(i,j);
-                Xp(i,j) = max(max(n_ranges{j-numComponents+1}) - dist, min(n_ranges{j-numComponents+1}));
+                nC_j = max(max(n_ranges{j-numComponents+1}) - dist, min(n_ranges{j-numComponents+1}));
+                [~, idx_neighb] = min(abs(n_ranges{j-numComponents+1} - nC_j));
+                Xp(i,j) = n_ranges{j-numComponents+1}(idx_neighb);
             end
             if Xp(i,j) > max(n_ranges{j-numComponents+1})
                 dist = Xp(i,j) - max(n_ranges{j-numComponents+1});
-                Xp(i,j) = min(min(n_ranges{j-numComponents+1}) + dist, max(n_ranges{j-numComponents+1}));
+                nC_j = min(min(n_ranges{j-numComponents+1}) + dist, max(n_ranges{j-numComponents+1}));
+                [~, idx_neighb] = min(abs(n_ranges{j-numComponents+1} - nC_j));
+                Xp(i,j) = n_ranges{j-numComponents+1}(idx_neighb);
             end
         end
 
