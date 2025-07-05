@@ -97,6 +97,10 @@ pressure_distillation = p_distillation(Dataset);
 
 %% --- BUILD FUNCTION HANDLES FOR THE PRIOR, LIKELIHOOD, AND POSTERIOR DISTRIBUTIONS --- %%
 
+% Define the (1 x numComponents) vector of concentration parameters for the Dirichlet distribution of molar fractions
+alpha = ones(1, numComponents); % unitary values for a symmetric uniform Dirichlet distribution
+
+% Functional handles for the PDFs
 [prior, likelihood, posterior] = pdf_build(fullData, families, classes, variable_names, pressure_distillation, LowerBound_molFrac, UpperBound_molFrac, n_ranges, LowerBound_eta_B_star, UpperBound_eta_B_star);
 
 %% --- DIFFERENTIAL EVOLUTION MARKOV CHAIN (DE-MC) TO EXPLORE POSTERIOR PDF --- %%
