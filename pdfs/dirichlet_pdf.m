@@ -29,37 +29,36 @@ function prob = dirichlet_pdf(x, alpha, LowerBound, UpperBound)
 
 % DESCRIPTION:
 % The dirichlet_pdf function returns the logarithmic probability density
-% of the symmetric Dirichlet distribution for the set of molar fractions.
+% of the Dirichlet distribution for the set of molar fractions.
 
 % Auxiliary parameters:
 % Nc: number of surrogate mixture components  [-]
 
 % Inputs:
 % 1) x         : (1 x Nc-1) array containing the molar fractions of the surrogate components  [-]
-% 2) alpha     : concentration parameter of the symmetric Dirichlet distribution  [-]
+% 2) alpha     : (1 x Nc) vector of concentration parameters for the Dirichlet distribution  [-]
 % 3) LowerBound: (1 x Nc) array, with the i-th element representing the
 % lower bound for the range the mole fraction of the i-th surrogate mixture
-% 3) UpperBound: (1 x Nc) array, with the i-th element representing the
+% 4) UpperBound: (1 x Nc) array, with the i-th element representing the
 % upper bound for the range the mole fraction of the i-th surrogate mixture
 
 % Outputs:
-% 1) prob: logarithmic probability density of the symmetric Dirichlet distribution
+% 1) prob: logarithmic probability density of the Dirichlet distribution
+
+% Reconstruct full vector of molar fractions
+x_full = [x 1-sum(x)];
 
 % Check that the inputs are valid
-if sum(x) > 1 - LowerBound(end) || sum(x) < 1 - UpperBound(end)
+if any(x_full < LowerBound) || any(x_full > UpperBound)
     prob = -Inf;
-    return
+    return;
 end
 
 % Compute the logarithmic probability density
-if alpha <= 0
-    error('alpha must be positive.')
-elseif alpha == 1
-    prob = log(1);
-elseif alpha == 2
-    prob = log(6) + sum(log(x)) + log(1 - sum(x));
+if any(alpha <= 0)
+    error('Alpha values must be strictly positive.');
 else
-    c = alpha*(alpha+1)*(alpha+2)/6;
-    prob = log(c) + (alpha - 1) * sum(log(x)) + (alpha - 1) * log(1 - sum(x));
+    log_const = gammaln(sum(alpha)) - sum(gammaln(alpha));
+    prob = log_const + sum((alpha - 1) .* log(x_full));
 end
 end
