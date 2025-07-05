@@ -44,11 +44,11 @@ function prob = discrete_uniform(n, n_ranges)
 % 1) prob: logarithmic probability density of the discrete uniform distribution
 
 % Calculate the total number of possible outcomes
-num_outcomes = prod(cellfun(@(r) (max(r) - min(r) + 1), n_ranges));
+num_outcomes = prod(cellfun(@numel, n_ranges));
 
 % Check if the input values for n are within their respective ranges of existence and are integers
 for i = 1:numel(n)
-    if n(i) < min(n_ranges{i}) || n(i) > max(n_ranges{i}) || n(i) ~= floor(n(i))
+    if ~ismember(n(i), n_ranges{i})
         prob = -Inf;
         return
     end
