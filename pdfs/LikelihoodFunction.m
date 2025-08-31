@@ -84,7 +84,7 @@ if ~strcmp(variable,'distillation') && ~strcmp(variable,'molWeight') && ~strcmp(
 
     phiModel = ThermophysicalProperties_LiquidMixture(variable, data(:,1), X, classes, index_n_eta, pressure);
     arrayLikelihood = log(2.*pi.*std.^2) + (phiModel - data(:, 2)).^2./(std.^2);
-    L = - 1./(2*numel(arrayLikelihood)) * sum(arrayLikelihood);
+    L = - 1./2 * sum(arrayLikelihood);
 
 elseif strcmp(variable,'distillation')
 
@@ -96,7 +96,7 @@ elseif strcmp(variable,'distillation')
     else
         arrayLikelihood = Inf;
     end
-    L = - 1./(2*numel(arrayLikelihood)) * sum(arrayLikelihood);
+    L = - 1./2 * sum(arrayLikelihood);
 
 elseif strcmp(variable,'molWeight')
 
@@ -112,7 +112,7 @@ elseif strcmp(variable,'molWeight')
     end
     phiModel = molWeight(molFrac, Wi);
     arrayLikelihood = log(2.*pi.*std.^2) + (phiModel - data(:, 1)).^2./(std.^2);
-    L = - 1./(2*numel(arrayLikelihood)) * sum(arrayLikelihood);
+    L = - 1./2 * sum(arrayLikelihood);
 
 elseif strcmp(variable,'HC')
 
@@ -145,7 +145,7 @@ elseif strcmp(variable,'HC')
     nHydrogen = round(nHydrogen, 2);
     phiModel = round(nHydrogen/nCarbon, 3);
     arrayLikelihood = log(2.*pi.*std.^2) + (phiModel - data(:, 1)).^2./(std.^2);
-    L = - 1./(2*numel(arrayLikelihood)) * sum(arrayLikelihood);
+    L = - 1./2 * sum(arrayLikelihood);
 
 elseif strcmp(variable,'DCN')
 
@@ -179,7 +179,7 @@ elseif strcmp(variable,'DCN')
 
     phiModel = sum(Vi.*DCN_i);
     arrayLikelihood = log(2.*pi.*std.^2) + (phiModel - data(:, 1)).^2./(std.^2);
-    L = - 1./(2*numel(arrayLikelihood)) * sum(arrayLikelihood);
+    L = - 1./2 * sum(arrayLikelihood);
 
 elseif strcmp(variable,'flash')
 
@@ -209,7 +209,7 @@ elseif strcmp(variable,'flash')
     phiModel = (phiModel_F-32)*5./9+273.15; % mixture flash point in [K]
 
     arrayLikelihood = log(2.*pi.*std.^2) + (phiModel - data(:, 1)).^2./(std.^2);
-    L = - 1./(2*numel(arrayLikelihood)) * sum(arrayLikelihood);
+    L = - 1./2 * sum(arrayLikelihood);
 
 elseif strcmp(variable,'freezing')
 
@@ -243,7 +243,7 @@ elseif strcmp(variable,'freezing')
     phiModel = BI_blend^0.05; % mixture freezing point [K]
 
     arrayLikelihood = log(2.*pi.*std.^2) + (phiModel - data(:, 1)).^2./(std.^2);
-    L = - 1./(2*numel(arrayLikelihood)) * sum(arrayLikelihood);
+    L = - 1./2 * sum(arrayLikelihood);
 
 elseif strcmp(variable,'LHV')
 
@@ -270,7 +270,7 @@ elseif strcmp(variable,'LHV')
     phiModel = sum(Yi'.*LHV_i);
 
     arrayLikelihood = log(2.*pi.*std.^2) + (phiModel - data(:, 1)).^2./(std.^2);
-    L = - 1./(2*numel(arrayLikelihood)) * sum(arrayLikelihood);
+    L = - 1./2 * sum(arrayLikelihood);
 
 end
 
