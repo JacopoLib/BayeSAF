@@ -25,7 +25,7 @@
 % Available at: https://dx.doi.org/10.2139/ssrn.5049145.
 % ------------------------------------------------------------------------%
 
-function  [prior, likelihood, posterior] = pdf_build(fullData, families, classes, variable_names, pressure_distillation, LowerBound_x, UpperBound_x, n_ranges, LowerBound_eta_B_star, UpperBound_eta_B_star)
+function  [prior, likelihood, posterior] = pdf_build(fullData, families, classes, variable_names, pressure_distillation, LowerBound_x, UpperBound_x, alpha, n_ranges, LowerBound_eta_B_star, UpperBound_eta_B_star)
 
 % DESCRIPTION:
 % The pdf_build function calculates the function handles representing the
