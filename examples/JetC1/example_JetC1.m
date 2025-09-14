@@ -101,7 +101,7 @@ pressure_distillation = p_distillation(Dataset);
 alpha = ones(1, numComponents); % unitary values for a symmetric uniform Dirichlet distribution
 
 % Functional handles for the PDFs
-[prior, likelihood, posterior] = pdf_build(fullData, families, classes, variable_names, pressure_distillation, LowerBound_molFrac, UpperBound_molFrac, n_ranges, LowerBound_eta_B_star, UpperBound_eta_B_star);
+[prior, likelihood, posterior] = pdf_build(fullData, families, classes, variable_names, pressure_distillation, LowerBound_molFrac, UpperBound_molFrac, alpha, n_ranges, LowerBound_eta_B_star, UpperBound_eta_B_star);
 
 %% --- DIFFERENTIAL EVOLUTION MARKOV CHAIN (DE-MC) TO EXPLORE POSTERIOR PDF --- %%
 
