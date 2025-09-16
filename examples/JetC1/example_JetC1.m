@@ -121,7 +121,7 @@ R_hat_threshold = 1.1; % threshold value for the R-hat statistic
 %% --- POST-PROCESSING --- %%
 
 % Return molar fractions, numbers of carbon atoms, and topochemical atom indices characterizing the maximum a posteriori surrogate mixture
-[x_MAP, nc_MAP, eta_B_star_MAP] = MAPfinder(chain_reshaped, numComponents);
+[x_MAP, nc_MAP, eta_B_star_MAP] = MAPfinder(posterior_pdf_reshaped, chain_reshaped, numComponents);
 
 % Write a text file and display information about the MAP surrogate
 species_MAP = MAPwriter(families, numComponents, x_MAP, nc_MAP, eta_B_star_MAP, fuel_name);
