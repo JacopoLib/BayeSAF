@@ -25,7 +25,7 @@
 % Available at: https://dx.doi.org/10.2139/ssrn.5049145.
 % ------------------------------------------------------------------------%
 
-function [x_MAP, nc_MAP, eta_B_star_MAP] = MAPfinder(chain, numComponents)
+function [x_MAP, nc_MAP, eta_B_star_MAP] = MAPfinder(posterior, chain, numComponents)
 
 % DESCRIPTION:
 % The MAPfinder function returns the molar fractions, numbers of carbon atoms,
