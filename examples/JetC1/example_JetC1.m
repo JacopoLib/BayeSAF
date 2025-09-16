@@ -125,7 +125,7 @@ R_hat_threshold = 1.1; % threshold value for the R-hat statistic
 
 % Write a text file and display information about the MAP surrogate
 species_MAP = MAPwriter(families, numComponents, x_MAP, nc_MAP, eta_B_star_MAP, fuel_name);
-%%
+
 % Visualize Bayesian inference analysis outcomes
 band_percentiles = 'True'; % 90% confidence interval colored with percentiles ('True') or not ('False')
 confidence_width = 0.95; % 'confidence_width'% confidence interval
