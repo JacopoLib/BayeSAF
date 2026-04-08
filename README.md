@@ -13,7 +13,7 @@ As part of mid-century net-zero carbon neutrality pathways, sustainable aviation
 
 (i) target physicochemical properties (real fuel emulation or jet fuel design)
 
-(ii) number of surrogate mixture components, N<sub>s</sub>
+(ii) number of surrogate mixture components, N<sub>s</sub>             
 (iii) corresponding hydrocarbon molecular groups, ℋ
 
 **What is _BayeSAF_ inferring then?**
