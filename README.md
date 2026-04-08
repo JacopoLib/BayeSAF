@@ -50,7 +50,7 @@ Liberatori J., Cavalieri D., Blandino M., Valorani M., and Ciottoli P.P., _BayeS
 # Example applications: uncertainty quantification of SAF evaporation and combustion processes
 
 Liberatori J., Cavalieri D., Blandino M., Iavarone S., Ciottoli P.P., and Vicquelin, R., _Deep-learning-based sequential Bayesian updating and uncertainty quantification of vaporization of aviation fuel surrogates: a case study on HEFA-SPK_, ASME Turbo Expo, 15-19 June 2026, Milan (Italy).
-
+![evap_UQ](img/evap_UQ.png)
 
 
 Copyright (C) 2026 Jacopo Liberatori - All Rights Reserved. You may use, distribute and modify this code under the terms of Prosperity Public License.
