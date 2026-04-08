@@ -11,7 +11,7 @@ As part of mid-century net-zero carbon neutrality pathways, sustainable aviation
 
 **<u>USER-DEFINED INPUTS<u>** 
 
-(i) target physicochemical properties (real fuel emulation or jet fuel design)
+(i) target physicochemical properties (real fuel emulation or jet fuel design)        
 (ii) number of surrogate mixture components, N<sub>s</sub>             
 (iii) corresponding hydrocarbon molecular groups, ℋ
 
