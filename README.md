@@ -40,15 +40,17 @@ Deep learning-based forward UQ on Bayes-informed sustainable aviation fuel surro
 
 # How to cite
 
-Liberatori J., Cavalieri D., Blandino M., Valorani M., and Ciottoli P.P., _BayeSAF: Emulation and Design of Sustainable Alternative Fuels via Bayesian Inference and Descriptors-Based Machine Learning_, Fuel (under review), 2025, https://doi.org/10.2139/ssrn.5049145.
+Liberatori J., Cavalieri D., Blandino M., Valorani M., and Ciottoli P.P., _BayeSAF: Emulation and Design of Sustainable Alternative Fuels via Bayesian Inference and Descriptors-Based Machine Learning_, Fuel 419, 138835 (2026), https://doi.org/10.1016/j.fuel.2026.138835.
 
 ```
-@article{liberatori2025bayesaf,
-  author       = {Jacopo Liberatori and Davide Cavalieri and Matteo Blandino and Mauro Valorani and {Pietro Paolo} Ciottoli},
-  title        = {{BayeSAF: Emulation and Design of Sustainable Alternative Fuels via Bayesian Inference and Descriptors-Based Machine Learning}},
-  journal      = {Fuel (under review)},
-  year         = {2024},
-  doi          = {10.2139/ssrn.5049145}
+@article{liberatori2026bayesaf,
+  author  = {Liberatori, Jacopo and Cavalieri, Davide and Blandino, Matteo and Valorani, Mauro and Ciottoli, Pietro Paolo},
+  title   = {{BayeSAF: Emulation and design of sustainable alternative fuels via Bayesian inference and descriptors-based machine learning}},
+  journal = {Fuel},
+  year    = {2026},
+  volume  = {419},
+  pages   = {138835},
+  doi     = {10.1016/j.fuel.2026.138835}
 }
 ```
-Copyright (C) 2025 Jacopo Liberatori - All Rights Reserved. You may use, distribute and modify this code under the terms of Prosperity Public License.
+Copyright (C) 2026 Jacopo Liberatori - All Rights Reserved. You may use, distribute and modify this code under the terms of Prosperity Public License.
