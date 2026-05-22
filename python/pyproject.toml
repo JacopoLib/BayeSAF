@@ -11,7 +11,7 @@ authors = [
     {name = "Davide Cavalieri", email = "davide.cavalieri@uniroma1.it"},
     {name = "Matteo Blandino", email = "matteo.blandino@uniroma1.it"},
 ]
-license = {text = "MIT"}
+license = {text = "Prosperity Public License 3.0.0"}
 requires-python = ">=3.9"
 dependencies = [
     "numpy>=1.24",
