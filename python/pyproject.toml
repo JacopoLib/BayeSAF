@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bayesaf"
+version = "0.1.0"
+description = "BayeSAF: Emulation and Design of Sustainable Alternative Fuels via Bayesian Inference and Descriptors-Based Machine Learning"
+authors = [
+    {name = "Jacopo Liberatori", email = "jacopo.liberatori@centralesupelec.fr"},
+    {name = "Davide Cavalieri", email = "davide.cavalieri@uniroma1.it"},
+    {name = "Matteo Blandino", email = "matteo.blandino@uniroma1.it"},
+]
+license = {text = "MIT"}
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "pandas>=2.0",
+    "matplotlib>=3.7",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "pytest-cov"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+bayesaf = ["database/**/*.csv"]
