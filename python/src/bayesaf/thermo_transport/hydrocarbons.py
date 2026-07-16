@@ -72,7 +72,7 @@ import pandas as pd
 
 # Path to the CSV database relative to this file:
 # src/bayesaf/thermo_transport/ → ../../../database/
-_DB_ROOT = Path(__file__).parent.parent.parent.parent / "database"
+_DB_ROOT = Path(__file__).parent.parent.parent.parent.parent / "database"
 
 _FAMILY_CSV: dict[str, str] = {
     "nparaffins": "nparaffins/nparaffins_MatlabData.csv",
@@ -81,7 +81,7 @@ _FAMILY_CSV: dict[str, str] = {
     "cycloparaffins": "cycloparaffins/cycloparaffins_MatlabData.csv",
     "dicycloparaffins": "dicycloparaffins/dicycloparaffins_MatlabData.csv",
     "alkylbenzenes": "alkylbenzenes/alkylbenzenes_MatlabData.csv",
-    "alkylnaphtalenes": "alkylnaphtalenes/alkylnaphtalenes_MatlabData.csv",
+    "alkylnaphthalenes": "alkylnaphtalenes/alkylnaphtalenes_MatlabData.csv",
     "cycloaromatics": "cycloaromatics/cycloaromatics_MatlabData.csv",
 }
 
