@@ -71,20 +71,20 @@ _NAMES_CSV: dict[str, str] = {
     "cycloparaffins": "cycloparaffins/cycloparaffins_Names.csv",
     "dicycloparaffins": "dicycloparaffins/dicycloparaffins_Names.csv",
     "alkylbenzenes": "alkylbenzenes/alkylbenzenes_Names.csv",
-    "alkylnaphtalenes": "alkylnaphtalenes/alkylnaphtalenes_Names.csv",
+    "alkylnaphthalenes": "alkylnaphthalenes/alkylnaphthalenes_Names.csv",
     "cycloaromatics": "cycloaromatics/cycloaromatics_Names.csv",
 }
 
 # H-atom count formula per family
 _H_FORMULA: dict[str, str] = {
-    "nparaffins":          "2n+2",
-    "isoparaffins":        "2n+2",
+    "nparaffins":            "2n+2",
+    "isoparaffins":          "2n+2",
     "isoparaffins_mono_bis": "2n+2",
-    "cycloparaffins":      "2n",
-    "dicycloparaffins":    "2n-2",
-    "alkylbenzenes":       "2n-6",
-    "alkylnaphtalenes":    "2n-12",
-    "cycloaromatics":      "2n-8",
+    "cycloparaffins":        "2n",
+    "dicycloparaffins":      "2n-2",
+    "alkylbenzenes":         "2n-6",
+    "alkylnaphthalenes":     "2n-12",
+    "cycloaromatics":        "2n-8",
 }
 
 _R_UNIV = 8.314   # J/(mol·K)
