@@ -126,13 +126,13 @@ end
 
 function tbl = get_table(class, npar, isopar, cyclopar, dicyclopar, alkben, alknaph, cycloaro)
 switch class
-    case 'nparaffins',       tbl = npar;
-    case 'isoparaffins',     tbl = isopar;
-    case 'cycloparaffins',   tbl = cyclopar;
-    case 'dicycloparaffins', tbl = dicyclopar;
-    case 'alkylbenzenes',    tbl = alkben;
-    case 'alkylnaphtalenes', tbl = alknaph;
-    case 'cycloaromatics',   tbl = cycloaro;
-    otherwise,               error('Unknown hydrocarbon class: %s', class);
+    case 'nparaffins',        tbl = npar;
+    case 'isoparaffins',      tbl = isopar;
+    case 'cycloparaffins',    tbl = cyclopar;
+    case 'dicycloparaffins',  tbl = dicyclopar;
+    case 'alkylbenzenes',     tbl = alkben;
+    case 'alkylnaphthalenes', tbl = alknaph;
+    case 'cycloaromatics',    tbl = cycloaro;
+    otherwise,                error('Unknown hydrocarbon class: %s', class);
 end
 end
