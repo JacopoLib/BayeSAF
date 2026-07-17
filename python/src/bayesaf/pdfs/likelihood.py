@@ -282,6 +282,7 @@ def log_likelihood(
     elif variable == "flash":
         W_mat = np.zeros((N_samples, Nc))
         bi_flash = np.zeros((N_samples, Nc))
+        has_invalid_flash = np.zeros(N_samples, dtype=bool)
         for j in range(Nc):
             for k in range(N_samples):
                 sp = classes[j][index_n_eta[k, j]]
@@ -290,13 +291,15 @@ def log_likelihood(
                 if flash_F > 0.0:
                     bi_flash[k, j] = 51708.0 * np.exp((np.log(flash_F) - 2.6287)**2 / (-0.91725))
                 else:
-                    bi_flash[k, j] = 0.0  # ASTM D-7215 undefined for Tf ≤ 0 °F → drives likelihood to -inf
+                    has_invalid_flash[k] = True  # ASTM D-7215 undefined for Tf ≤ 0 °F
         Y_i = np.array([mol_to_mass(mol_frac_mat[k], W_mat[k]) for k in range(N_samples)])
         bi_blend = (Y_i * bi_flash).sum(axis=1)
         ratio = np.maximum(bi_blend / 51708.0, 1e-300)
         phi_F = np.exp(np.sqrt((-0.91725) * np.log(ratio)) + 2.6287)
         phi = (phi_F - 32.0) * 5.0 / 9.0 + 273.15
-        return _gaussian_log_likelihood(phi, data[:, 0], std_data)
+        L = _gaussian_log_likelihood(phi, data[:, 0], std_data)
+        L[has_invalid_flash] = -np.inf
+        return L
 
     elif variable == "freezing":
         W_mat = np.zeros((N_samples, Nc))
