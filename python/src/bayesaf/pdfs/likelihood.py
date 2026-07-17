@@ -287,7 +287,10 @@ def log_likelihood(
                 sp = classes[j][index_n_eta[k, j]]
                 W_mat[k, j] = sp.mol_weight
                 flash_F = (sp.Tf - 273.15) * 9.0 / 5.0 + 32.0
-                bi_flash[k, j] = 51708.0 * np.exp((np.log(flash_F) - 2.6287)**2 / (-0.91725))
+                if flash_F > 0.0:
+                    bi_flash[k, j] = 51708.0 * np.exp((np.log(flash_F) - 2.6287)**2 / (-0.91725))
+                else:
+                    bi_flash[k, j] = 0.0  # ASTM D-7215 undefined for Tf ≤ 0 °F → drives likelihood to -inf
         Y_i = np.array([mol_to_mass(mol_frac_mat[k], W_mat[k]) for k in range(N_samples)])
         bi_blend = (Y_i * bi_flash).sum(axis=1)
         ratio = np.maximum(bi_blend / 51708.0, 1e-300)
