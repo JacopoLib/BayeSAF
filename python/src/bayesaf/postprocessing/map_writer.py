@@ -71,20 +71,20 @@ _NAMES_CSV: dict[str, str] = {
     "cycloparaffins": "cycloparaffins/cycloparaffins_Names.csv",
     "dicycloparaffins": "dicycloparaffins/dicycloparaffins_Names.csv",
     "alkylbenzenes": "alkylbenzenes/alkylbenzenes_Names.csv",
-    "alkylnaphthalenes": "alkylnaphthalenes/alkylnaphthalenes_Names.csv",
+    "alkylnaphtalenes": "alkylnaphtalenes/alkylnaphtalenes_Names.csv",
     "cycloaromatics": "cycloaromatics/cycloaromatics_Names.csv",
 }
 
 # H-atom count formula per family
 _H_FORMULA: dict[str, str] = {
-    "nparaffins":            "2n+2",
-    "isoparaffins":          "2n+2",
+    "nparaffins":          "2n+2",
+    "isoparaffins":        "2n+2",
     "isoparaffins_mono_bis": "2n+2",
-    "cycloparaffins":        "2n",
-    "dicycloparaffins":      "2n-2",
-    "alkylbenzenes":         "2n-6",
-    "alkylnaphthalenes":     "2n-12",
-    "cycloaromatics":        "2n-8",
+    "cycloparaffins":      "2n",
+    "dicycloparaffins":    "2n-2",
+    "alkylbenzenes":       "2n-6",
+    "alkylnaphtalenes":    "2n-12",
+    "cycloaromatics":      "2n-8",
 }
 
 _R_UNIV = 8.314   # J/(mol·K)
@@ -243,12 +243,21 @@ def write_map(
     # ------------------------------------------------------------------
     # 5. Flash point  (mass-weighted blending index, ASTM D-7215 approach)
     #    MATLAB: BI = 51708 * exp((log(Tf_F) - 2.6287)^2 / -0.91725)
+    #    Valid only when all component flash points > 0 °F (> 255.37 K).
     # ------------------------------------------------------------------
-    Tf_F     = (Tf_i - 273.15) * 9.0 / 5.0 + 32.0          # K → °F
-    BI_flash = 51708.0 * np.exp((np.log(Tf_F) - 2.6287)**2 / (-0.91725))
-    BI_blend_flash   = float(np.dot(y_MAP, BI_flash))
-    flash_point_F    = math.exp(math.sqrt(-0.91725 * math.log(BI_blend_flash / 51708.0)) + 2.6287)
-    flash_point      = (flash_point_F - 32.0) * 5.0 / 9.0 + 273.15  # °F → K
+    Tf_F = (Tf_i - 273.15) * 9.0 / 5.0 + 32.0          # K → °F
+    if np.any(Tf_F <= 0.0):
+        flash_point = float("nan")
+        print(
+            "  Warning: flash point set to NaN — ASTM D-7215 requires all "
+            "component flash points > 0 °F; one or more components have "
+            f"Tf ≤ 255.37 K ({', '.join(f'{t:.1f} K' for t in Tf_i[Tf_F <= 0.0])})."
+        )
+    else:
+        BI_flash        = 51708.0 * np.exp((np.log(Tf_F) - 2.6287)**2 / (-0.91725))
+        BI_blend_flash  = float(np.dot(y_MAP, BI_flash))
+        flash_point_F   = math.exp(math.sqrt(-0.91725 * math.log(BI_blend_flash / 51708.0)) + 2.6287)
+        flash_point     = (flash_point_F - 32.0) * 5.0 / 9.0 + 273.15  # °F → K
 
     # ------------------------------------------------------------------
     # 6. Freezing point  (volume-weighted BI^(1/0.05))
