@@ -102,10 +102,16 @@ import sys
 from typing import Callable, Sequence
 
 import numpy as np
-from scipy.spatial.distance import cdist
 
 from bayesaf.thermo_transport.hydrocarbons import Species
 from bayesaf.distillation.distillation_curve import init_pool, shutdown_pool
+from bayesaf.mcmc.layout import (  # noqa: F401  (decoders re-exported for compatibility)
+    ParameterLayout,
+    SurrogateLayout,
+    _decode_eta,
+    _decode_nc,
+    _triangle_fold,
+)
 
 # Type alias for vectorised posterior callable
 PostFn = Callable[[np.ndarray, np.ndarray, np.ndarray], np.ndarray]
@@ -265,194 +271,6 @@ def _detect_outliers(
                 outliers.append(j)
     return outliers
 
-
-# ---------------------------------------------------------------------------
-# Parameter encoding/decoding
-# ---------------------------------------------------------------------------
-
-def _decode_nc(u: float, n_range: list[int]) -> int:
-    """Map normalised u ∈ [0,1] to a discrete carbon count."""
-    k = len(n_range)
-    idx = min(int(np.floor(u * k)), k - 1)
-    return n_range[idx]
-
-
-def _decode_eta(
-    u: float,
-    sp_list: list[Species],
-    nC_val: int,
-) -> float:
-    """Map normalised u ∈ [0,1] to the closest eta_B_star_norm for nC_val.
-
-    Replicates the MATLAB formula exactly:
-        idx_eta = round(1 + u*(N-1))   [1-based, round-half-away-from-zero]
-    converted to 0-based Python indexing:
-        idx_eta = floor(1 + u*(N-1) + 0.5) - 1
-    """
-    eta_all = np.array([sp.eta_B_star for sp in sp_list])
-    eta_sorted = np.sort(eta_all)
-    N = len(eta_sorted)
-    # MATLAB-compatible rounding: floor(x + 0.5) = round-half-away-from-zero
-    idx_eta = int(np.floor(1.0 + u * (N - 1) + 0.5)) - 1
-    idx_eta = max(0, min(idx_eta, N - 1))
-    eta_target = eta_sorted[idx_eta]
-
-    # Restrict to species with matching nC
-    nC_arr = np.array([sp.nC for sp in sp_list], dtype=int)
-    eta_norm_arr = np.array([sp.eta_B_star_norm for sp in sp_list])
-    match = np.where(nC_arr == nC_val)[0]
-    eta_match = eta_all[match]
-    eta_norm_match = eta_norm_arr[match]
-    return float(eta_norm_match[np.argmin(np.abs(eta_match - eta_target))])
-
-
-def _triangle_fold(x: float) -> float:
-    """Reflect x into [0,1] with a triangle-wave mapping."""
-    return 1.0 - abs(1.0 - (x % 2))
-
-
-# ---------------------------------------------------------------------------
-# Benchmark helper: decode a pre-generated normalised init matrix
-# ---------------------------------------------------------------------------
-
-def _decode_x_init(
-    x_init: np.ndarray,
-    Nc: int,
-    n_ranges: list[list[int]],
-    classes: list[list[Species]],
-    lower_bound_x: np.ndarray,
-    upper_bound_x: np.ndarray,
-    posterior_fn,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Decode a pre-generated normalised chain state matrix into physical parameters.
-
-    Parameters
-    ----------
-    x_init : ndarray, shape (N_chains, 3*Nc-1)
-        Normalised parameter vectors saved by generate_benchmark_init.py.
-
-    Returns
-    -------
-    Same tuple as _init_population: (X, mol_vals, nC_vals, eta_vals, p_X).
-    """
-    N = x_init.shape[0]
-    mol_vals = np.zeros((N, Nc - 1))
-    nC_vals  = np.zeros((N, Nc), dtype=int)
-    eta_vals = np.zeros((N, Nc), dtype=float)
-
-    for j in range(N):
-        for k in range(Nc - 1):
-            mol_vals[j, k] = (x_init[j, k] * (upper_bound_x[k] - lower_bound_x[k])
-                              + lower_bound_x[k])
-        for k in range(Nc):
-            nC_vals[j, k] = _decode_nc(x_init[j, Nc - 1 + k], n_ranges[k])
-        for k in range(Nc):
-            eta_vals[j, k] = _decode_eta(
-                x_init[j, 2 * Nc - 1 + k], classes[k], int(nC_vals[j, k])
-            )
-
-    p_X = posterior_fn(mol_vals, nC_vals.astype(float), eta_vals)
-    return x_init.copy(), mol_vals, nC_vals, eta_vals, p_X
-
-
-# ---------------------------------------------------------------------------
-# Initialisation
-# ---------------------------------------------------------------------------
-
-def _init_population(
-    N_chains: int,
-    Nc: int,
-    n_ranges: list[Sequence[int]],
-    classes: list[list[Species]],
-    lower_bound_x: np.ndarray,
-    upper_bound_x: np.ndarray,
-    posterior_fn: PostFn,
-    rng: np.random.RandomState,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Sample an initial population on the parameter space.
-
-    Returns (X_norm, molFrac, nC_vals, eta_norm, p_X, selected physical params).
-    X_norm is the normalised representation; molFrac/nC_vals/eta_norm are physical.
-    """
-    n_params = 3 * Nc - 1
-    N_needed = 10 * N_chains
-    batch = max(1000, 5 * N_needed)
-    K_rest = 2 * Nc   # nC (Nc) + eta (Nc)
-
-    valid_samples = np.empty((0, n_params), dtype=float)
-
-    while valid_samples.shape[0] < N_needed:
-        # Dirichlet(1) samples
-        Y = -np.log(rng.random_sample((batch, Nc)))
-        dir_samples = Y / Y.sum(axis=1, keepdims=True)
-
-        lb = lower_bound_x
-        ub = upper_bound_x
-        ok = np.all((dir_samples >= lb) & (dir_samples <= ub), axis=1)
-        val_dir = dir_samples[ok]
-        if val_dir.shape[0] == 0:
-            continue
-
-        # Normalise molar fractions to [0,1]
-        val_norm = (val_dir[:, :Nc - 1] - lb[:Nc - 1]) / (ub[:Nc - 1] - lb[:Nc - 1])
-        n_valid = val_norm.shape[0]
-        rest = rng.random_sample((n_valid, K_rest))
-        batch_samples = np.hstack([val_norm, rest])
-        valid_samples = np.vstack([valid_samples, batch_samples])
-
-    # Decode physical parameters for all valid samples
-    N_lhs = valid_samples.shape[0]
-    mol_lhs = np.full((N_lhs, Nc - 1), np.inf)
-    nC_lhs = np.zeros((N_lhs, Nc), dtype=int)
-    eta_lhs = np.zeros((N_lhs, Nc), dtype=float)
-    X_lhs = valid_samples.copy()
-
-    n_ranges_list = [list(r) for r in n_ranges]
-
-    for i in range(N_lhs):
-        # Molar fractions
-        for j in range(Nc - 1):
-            mol_lhs[i, j] = valid_samples[i, j] * (upper_bound_x[j] - lower_bound_x[j]) + lower_bound_x[j]
-
-        # Carbon numbers
-        for k in range(Nc):
-            u = valid_samples[i, (Nc - 1) + k]
-            nC_lhs[i, k] = _decode_nc(u, n_ranges_list[k])
-
-        # Topochemical indices
-        for l in range(Nc):
-            eta_lhs[i, l] = _decode_eta(
-                valid_samples[i, (2 * Nc - 1) + l],
-                classes[l],
-                int(nC_lhs[i, l]),
-            )
-
-    # Compute posterior for all LHS samples
-    p_lhs = posterior_fn(mol_lhs, nC_lhs.astype(float), eta_lhs)
-
-    # Select N_chains diverse initial points (max-min-distance greedy)
-    phys = np.hstack([mol_lhs, nC_lhs, eta_lhs])
-    N = phys.shape[0]
-    selected = np.zeros(N_chains, dtype=int)
-    selected[0] = rng.randint(N)
-    for k in range(1, N_chains):
-        remaining = np.setdiff1d(np.arange(N), selected[:k])
-        dists = cdist(phys[remaining], phys[selected[:k]]).min(axis=1)
-        selected[k] = remaining[dists.argmax()]
-
-    perm = rng.permutation(N_chains)
-    selected = selected[perm]
-
-    X_out = X_lhs[selected]
-    mol_out = mol_lhs[selected]
-    nC_out = nC_lhs[selected]
-    eta_out = eta_lhs[selected]
-    p_out = p_lhs[selected]
-
-    return X_out, mol_out, nC_out, eta_out, p_out
-    
 
 # ---------------------------------------------------------------------------
 # Gibbs moves
@@ -714,33 +532,39 @@ def run_demc(
     log_file: str = "MCMC.txt",
     seed: int = 1234,
     x_init: np.ndarray | None = None,
+    layout: ParameterLayout | None = None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
     """
     Run the DE-MC algorithm with delayed acceptance and parallel tempering.
 
-    Parameters mirror the MATLAB function signature exactly.
+    Parameters mirror the MATLAB function signature exactly, plus ``layout``:
+    a ParameterLayout describing the state vector. If None, the standard
+    single-surrogate SurrogateLayout (3*Nc-1 parameters) is built from
+    classes, n_ranges and the molar-fraction bounds.
 
     Returns
     -------
-    chain : ndarray, shape (t_conv, 3*Nc-1, N_chains)
-        Normalised parameter chains (molar fractions, nC, eta).
+    chain : ndarray, shape (t_conv, n_params, N_chains)
+        Physical parameter chains (molar fractions, nC, eta) in the column
+        order of the layout; n_params = 3*Nc-1 for the standard layout.
     posterior_pdf : ndarray, shape (t_conv, N_chains)
         Log-posterior values.
-    chain_reshaped : ndarray, shape (N_post * N_chains, 3*Nc-1)
+    chain_reshaped : ndarray, shape (N_post * N_chains, n_params)
         Post-burnin samples from all chains concatenated.
     posterior_pdf_reshaped : ndarray, shape (N_post * N_chains,)
         Log-posterior for reshaped chain.
     AR : ndarray, shape (t_conv, N_chains)
         Acceptance rates (%).
-    R_hat : ndarray, shape (n_checks, 3*Nc-1)
+    R_hat : ndarray, shape (n_checks, n_params)
         R-hat statistics.
     t_convergence : int
         Iteration at which convergence was declared.
     """
     rng = np.random.RandomState(seed)  # MT19937 — matches MATLAB rng(seed,'twister')
-    Nc = len(classes)
-    n_params = 3 * Nc - 1
-    n_ranges_list = [list(r) for r in n_ranges]
+    if layout is None:
+        layout = SurrogateLayout(classes, n_ranges, lower_bound_x, upper_bound_x)
+    n_params = layout.n_params
+    n_units = len(layout.units)
 
     # Start a persistent worker pool.  Passing *classes* to the initializer
     # pre-loads the species database in each worker so it is not re-pickled
@@ -778,10 +602,10 @@ def run_demc(
         fid.write(_hdr)
 
     # ── Preallocate ─────────────────────────────────────────────────────────
-    x_chain = np.full((max_iterations, n_params, N_chains), np.nan)
-    mol_chain = np.full((max_iterations, Nc - 1, N_chains), np.nan)
-    nC_chain_arr = np.full((max_iterations, Nc, N_chains), np.nan)
-    eta_chain_arr = np.full((max_iterations, Nc, N_chains), np.nan)
+    # phys_chain stores physical values (molar fractions, nC, eta_B_star_norm)
+    # with the column layout of `layout`; x_archive stores normalised states
+    # for the snooker jump.
+    phys_chain = np.full((max_iterations, n_params, N_chains), np.nan)
     p_x = np.full((max_iterations, N_chains), np.nan)
     accept_arr = np.full((max_iterations, N_chains), np.nan)
     AR = np.full((max_iterations, N_chains), np.nan)
@@ -791,22 +615,13 @@ def run_demc(
     # ── Initialise population ───────────────────────────────────────────────
     if x_init is not None:
         # External initial states (benchmark mode) — bypass random sampling.
-        X, mol_vals, nC_vals, eta_vals, p_X = _decode_x_init(
-            x_init, Nc, n_ranges_list, classes,
-            lower_bound_x, upper_bound_x, posterior_fn,
-        )
+        X, phys, p_X = layout.decode_init(x_init, posterior_fn)
     else:
-        X, mol_vals, nC_vals, eta_vals, p_X = _init_population(
-            N_chains, Nc, n_ranges_list, classes,
-            lower_bound_x, upper_bound_x, posterior_fn, rng,
-        )
+        X, phys, p_X = layout.init_population(N_chains, posterior_fn, rng)
     # p_X is a 1-D array (N_chains,)
 
     t = 0  # 0-based index
-    x_chain[t] = X.T
-    mol_chain[t] = mol_vals.T
-    nC_chain_arr[t] = nC_vals.T.astype(float)
-    eta_chain_arr[t] = eta_vals.T
+    phys_chain[t] = phys.T
     p_x[t] = p_X
     accept_arr[t] = 1.0
     AR[t] = 100.0
@@ -839,27 +654,17 @@ def run_demc(
     #
     # A parameter is constant if all species in that family share a single
     # distinct eta_B_star_norm value (regardless of nC).
-    _eta_const = np.zeros(Nc, dtype=bool)
-    for j in range(Nc):
-        unique_eta = len(set(sp.eta_B_star_norm for sp in classes[j]))
-        _eta_const[j] = (unique_eta == 1)
+    _rhat_skip = layout.rhat_skip()
 
-    # phys_chain layout: [mol(Nc-1) | nC(Nc) | eta(Nc)]
-    # Build a mask over all n_params columns; True = skip from convergence check.
-    _rhat_skip = np.zeros(n_params, dtype=bool)
-    for j in range(Nc):
-        if _eta_const[j]:
-            _rhat_skip[2 * Nc - 1 + j] = True
-
-    if fid is not None and _eta_const.any():
-        skipped = [families[j] for j in range(Nc) if _eta_const[j]]
+    if fid is not None and _rhat_skip.any():
+        skipped = [families[k] for unit in layout.units for k in np.where(unit.constant_eta())[0]]
         fid.write(
             f"R-hat skipped (constant eta) for families: {skipped}\n"
         )
 
     # ── Main loop ────────────────────────────────────────────────────────────
     for _iter in range(1, max_iterations):
-        t = _iter        
+        t = _iter
 
         if t > t_burnin:
             beta_arr = np.ones(N_chains)
@@ -871,9 +676,7 @@ def run_demc(
         draw = np.argsort(rng.random_sample((N_chains - 1, N_chains)), axis=0)
 
         Xp = X.copy()
-        mol_vals_new = mol_vals.copy()
-        nC_vals_new = nC_vals.copy()
-        eta_vals_new = eta_vals.copy()
+        phys_new = phys.copy()
 
         J = np.zeros(N_chains)
         log_pi1_x_vec = np.zeros(N_chains)
@@ -884,33 +687,32 @@ def run_demc(
             r_gibbs = rng.random_sample()
 
             Xp_temp = Xp[i].copy()
-            mol_temp = mol_vals[i].copy()
-            nC_temp = nC_vals[i].copy()
-            eta_temp = eta_vals[i].copy()
-            
+            phys_temp = phys[i].copy()
+
             # Choose block
             if r_gibbs > p_gibbs:
-                group_idx = rng.randint(0, 3)
-                block_group = ["fractions", "nC", "eta"][group_idx]
+                block = layout.blocks[rng.randint(0, len(layout.blocks))]
             else:
-                block_group = "fractions"
+                block = layout.fractions_block(0 if n_units == 1 else rng.randint(0, n_units))
+            unit = layout.units[block.unit]
+            Nc = unit.Nc
 
             # Scaling factors and jump partner indices
             # MATLAB: D = randsample(1:n_pairs, 1, 'true');
             D = int(rng.randint(1, n_pairs + 1))
-            
+
             # MATLAB:
             # a = R(i,draw(1:D,i));
             # b = R(i,draw(D+1:2*D,i));
             a_idx = R_mat[i][draw[:D, i]]
             b_idx = R_mat[i][draw[D:2 * D, i]]
-            
+
             gamma_x = scaling_factor_x * 2.38 / np.sqrt(2 * D * (Nc - 1))
             gamma_nc = scaling_factor_nc * 2.38 / np.sqrt(2 * D * Nc)
             gamma_eta = scaling_factor_eta * 2.38 / np.sqrt(2 * D * Nc)
-            
+
             g_x = gamma_x if rng.random_sample() < 0.9 else 1.0
-            
+
             # MATLAB treats gamma_nc elementwise if it is a vector
             if np.isscalar(gamma_nc):
                 g_nc = gamma_nc
@@ -920,19 +722,19 @@ def run_demc(
                 g_nc = np.asarray(gamma_nc, dtype=float).copy()
                 mask = rng.random_sample(g_nc.shape) < 0.9
                 g_nc[~mask] = 1.0
-            
+
             g_eta = gamma_eta if rng.random_sample() < 0.9 else 1.0
 
             # ── Snooker-jump pre-computation ───────────────────────────────
             # Active only for the fractions block, after burn-in and after a
-            # warm-up of 10*(3*Nc-1) steps (mirrors the MATLAB condition).
+            # warm-up of 10*n_params steps (mirrors the MATLAB condition).
             r_move = rng.random_sample()
             use_snooker = (
                 p_snooker > 0.0
                 and r_move < p_snooker
                 and t > 10 * n_params
                 and t > t_burnin
-                and block_group == "fractions"
+                and block.kind == "fractions"
             )
             xR_snooker = None
             z_snooker = None
@@ -963,25 +765,26 @@ def run_demc(
                 else:
                     use_snooker = False   # not enough archive data yet
 
-            if block_group == "fractions":
+            cols = block.cols
+            if block.kind == "fractions":
                 if use_snooker:
                     # Snooker proposal (molar-fraction subspace only)
-                    Xp_temp[:Nc - 1] = (
-                        X[i, :Nc - 1]
-                        + g_snooker * z_proj[:Nc - 1]
-                        + noise_x * _mt_randn_vec(rng, Nc - 1)
+                    Xp_temp[cols] = (
+                        X[i, cols]
+                        + g_snooker * z_proj[cols]
+                        + noise_x * _mt_randn_vec(rng, len(cols))
                     )
                     # Jacobian correction (ter Braak & Vrugt 2008, eq. 6)
-                    d    = Nc - 1
-                    zp   = xR_snooker[:Nc - 1] - Xp_temp[:Nc - 1]
+                    d    = len(cols)
+                    zp   = xR_snooker[cols] - Xp_temp[cols]
                     epsJ = 1e-12
                     J[i] = (d - 1) * (
-                        np.log(np.linalg.norm(z_snooker[:Nc - 1]) + epsJ)
+                        np.log(np.linalg.norm(z_snooker[cols]) + epsJ)
                         - np.log(np.linalg.norm(zp) + epsJ)
                     )
                 else:
                     # Standard DE move
-                    for j in range(Nc - 1):
+                    for j in cols:
                         de_diff = np.sum(X[a_idx, j] - X[b_idx, j], axis=0)
                         Xp_temp[j] = (
                             X[i, j]
@@ -989,21 +792,21 @@ def run_demc(
                             + noise_x * _mt_randn(rng)
                         )
 
-            elif block_group == "nC":
-                for j in range(Nc - 1, 2 * Nc - 1):
+            elif block.kind == "nC":
+                for k, j in enumerate(cols):
                     de_diff = np.sum(X[a_idx, j] - X[b_idx, j], axis=0)
                     if np.isscalar(g_nc):
                         jump_scale = g_nc
                     else:
-                        jump_scale = g_nc[j - (Nc - 1)]
+                        jump_scale = g_nc[k]
                     Xp_temp[j] = (
                         X[i, j]
                         + (1 - lambda_vec[i]) * jump_scale * de_diff
                         + noise_nc * _mt_randn(rng)
                     )
 
-            elif block_group == "eta":
-                for j in range(2 * Nc - 1, 3 * Nc - 1):
+            elif block.kind == "eta":
+                for j in cols:
                     de_diff = np.sum(X[a_idx, j] - X[b_idx, j], axis=0)
                     Xp_temp[j] = (
                         X[i, j]
@@ -1012,26 +815,17 @@ def run_demc(
                         )
 
             # ── Boundary handling ──────────────────────────────────────────
-            for j in range(Nc - 1):
-                if Xp_temp[j] < 0:
-                    Xp_temp[j] = max(1 - abs(Xp_temp[j]), 0)
-                elif Xp_temp[j] > 1:
-                    Xp_temp[j] = min(abs(Xp_temp[j] - 1), 1)
-                mol_temp[j] = Xp_temp[j] * (upper_bound_x[j] - lower_bound_x[j]) + lower_bound_x[j]
+            unit.fold_fractions(Xp_temp, phys_temp)
 
             # ── Gibbs-like update for discrete parameters ──────────────────
-            last_comp_sum_ok = (
-                mol_temp.sum() <= 1.0 - lower_bound_x[-1]
-                and mol_temp.sum() >= 1.0 - upper_bound_x[-1]
-                and r_gibbs <= p_gibbs
-            )
+            last_comp_sum_ok = unit.fractions_sum_ok(phys_temp) and r_gibbs <= p_gibbs
 
             if last_comp_sum_ok:
                 # Gibbs step: candidate construction
                 n_comp_update = min(Nc, Nc if t > t_burnin else 1)
                 max_comb = 10 * n_comp_update + (N_chains - 1) if t > t_burnin else np.inf
                 components = rng.permutation(Nc)[:n_comp_update]
-            
+
                 mol_all, nC_all, eta_all = _build_gibbs_candidates(
                     i=i,
                     t=t,
@@ -1039,73 +833,55 @@ def run_demc(
                     Nc=Nc,
                     N_chains=N_chains,
                     components=np.asarray(components, dtype=int),
-                    classes=classes,
-                    n_ranges_list=n_ranges_list,
-                    mol_temp=mol_temp,
-                    nC_temp=nC_temp,
-                    eta_temp=eta_temp,
-                    nC_vals=nC_vals,
-                    eta_vals=eta_vals,
+                    classes=unit.classes,
+                    n_ranges_list=unit.n_ranges,
+                    mol_temp=phys_temp[unit.frac_cols],
+                    nC_temp=phys_temp[unit.nc_cols],
+                    eta_temp=phys_temp[unit.eta_cols],
+                    nC_vals=phys[:, unit.nc_cols],
+                    eta_vals=phys[:, unit.eta_cols],
                     max_comb=max_comb,
                     rng=rng,
                 )
-            
-                log_p_all = posterior_cheap_fn(mol_all, nC_all, eta_all)
+
+                # Embed the unit-level candidates into full state rows
+                phys_cand = np.tile(phys_temp, (mol_all.shape[0], 1))
+                phys_cand[:, unit.frac_cols] = mol_all
+                phys_cand[:, unit.nc_cols] = nC_all
+                phys_cand[:, unit.eta_cols] = eta_all
+
+                log_p_all = posterior_cheap_fn(*layout.posterior_args(phys_cand))
                 max_lp = np.max(log_p_all)
-                w = np.exp(log_p_all - max_lp)
-                w /= np.sum(w)
-            
+                if not np.isfinite(max_lp):
+                    # All candidates have -inf posterior (e.g. all flash points ≤ 0 °F);
+                    # fall back to uniform weights so the chain can still move.
+                    w = np.ones(len(log_p_all)) / len(log_p_all)
+                else:
+                    w = np.exp(log_p_all - max_lp)
+                    w /= np.sum(w)
+
                 idx_sel = int(rng.choice(len(w), p=w))
                 log_pi1_y_vec[i] = log_p_all[idx_sel]
-            
+
                 for cc in range(n_comp_update):
                     j_comp = int(components[cc])
-                    nC_temp[j_comp] = int(nC_all[idx_sel, j_comp])
-                    eta_temp[j_comp] = eta_all[idx_sel, j_comp]
-            
-                    # Update normalized X for nC
-                    n_rng = n_ranges_list[j_comp]
-                    jn = j_comp + (Nc - 1)
-                    Xp_temp[jn] = (nC_temp[j_comp] - min(n_rng)) / (max(n_rng) - min(n_rng) + 1e-12)
-            
-                    # Update normalized X for eta
-                    sp_list = classes[j_comp]
-                    eta_all_sp = np.array([sp.eta_B_star for sp in sp_list])
-                    eta_sorted = np.sort(eta_all_sp)
-                    eta_list_nc = np.array([sp.eta_B_star for sp in sp_list if sp.nC == nC_temp[j_comp]])
-            
-                    if len(eta_list_nc) > 0:
-                        eta_unnorm = min(eta_list_nc) + eta_temp[j_comp] * (max(eta_list_nc) - min(eta_list_nc))
-                        idx_neighb = int(np.argmin(np.abs(eta_sorted - eta_unnorm)))
-                    else:
-                        idx_neighb = 0
-            
-                    je = jn + Nc
-                    Xp_temp[je] = idx_neighb / max(1, len(eta_sorted) - 1)
-            
+                    nC_sel = int(nC_all[idx_sel, j_comp])
+                    eta_sel = eta_all[idx_sel, j_comp]
+                    phys_temp[unit.nc_cols[j_comp]] = nC_sel
+                    phys_temp[unit.eta_cols[j_comp]] = eta_sel
+                    # Update normalized X for nC and eta
+                    unit.encode_discrete(Xp_temp, j_comp, nC_sel, eta_sel)
+
                 log_pi1_x_vec[i] = posterior_cheap_fn(
-                    mol_vals[i:i+1],
-                    nC_vals[i:i+1].astype(float),
-                    eta_vals[i:i+1],
+                    *layout.posterior_args(phys[i:i+1])
                 )[0]
 
-            elif block_group in ("nC", "eta"):
+            elif block.kind in ("nC", "eta"):
                 # Continuous-to-discrete mapping with triangle-fold
-                for j in range(Nc - 1, 2 * Nc - 1):
-                    xj = _triangle_fold(Xp_temp[j])
-                    Xp_temp[j] = xj
-                    nC_temp[j - (Nc - 1)] = _decode_nc(xj, n_ranges_list[j - (Nc - 1)])
-
-                for j in range(2 * Nc - 1, 3 * Nc - 1):
-                    xj = _triangle_fold(Xp_temp[j])
-                    Xp_temp[j] = xj
-                    comp = j - (2 * Nc - 1)
-                    eta_temp[comp] = _decode_eta(xj, classes[comp], int(nC_temp[comp]))
+                unit.decode_discrete(Xp_temp, phys_temp)
 
             Xp[i] = Xp_temp
-            mol_vals_new[i] = mol_temp
-            nC_vals_new[i] = nC_temp
-            eta_vals_new[i] = eta_temp
+            phys_new[i] = phys_temp
 
         # ── Delayed-acceptance ─────────────────────────────────────────────
         log_alpha1 = beta_arr * (log_pi1_y_vec - log_pi1_x_vec) + J
@@ -1116,11 +892,8 @@ def run_demc(
 
         if pass1.any():
             idx_pass = np.where(pass1)[0]
-            mol_pass = mol_vals_new[idx_pass]
-            nC_pass = nC_vals_new[idx_pass].astype(float)
-            eta_pass = eta_vals_new[idx_pass]
 
-            p_y_full = posterior_fn(mol_pass, nC_pass, eta_pass)
+            p_y_full = posterior_fn(*layout.posterior_args(phys_new[idx_pass]))
 
             delta_full = p_y_full - p_X[idx_pass]
             delta_cheap = log_pi1_y_vec[idx_pass] - log_pi1_x_vec[idx_pass]
@@ -1132,9 +905,7 @@ def run_demc(
             if accept2.any():
                 idx_acc = idx_pass[accept2]
                 X[idx_acc] = Xp[idx_acc]
-                mol_vals[idx_acc] = mol_vals_new[idx_acc]
-                nC_vals[idx_acc] = nC_vals_new[idx_acc]
-                eta_vals[idx_acc] = eta_vals_new[idx_acc]
+                phys[idx_acc] = phys_new[idx_acc]
                 p_X[idx_acc] = p_y_full[accept2]
                 accept_arr[t, idx_acc] = accept_arr[t - 1, idx_acc] + 1
 
@@ -1151,10 +922,8 @@ def run_demc(
                     p_X[[k, k + 1]] = p_X[[k + 1, k]]
                     # Keep physical representations consistent with the swapped
                     # normalised state so that chain_reshaped (which is built from
-                    # mol_chain/nC_chain_arr/eta_chain_arr) always matches p_x.
-                    mol_vals[[k, k + 1]] = mol_vals[[k + 1, k]]
-                    nC_vals[[k, k + 1]] = nC_vals[[k + 1, k]]
-                    eta_vals[[k, k + 1]] = eta_vals[[k + 1, k]]
+                    # phys_chain) always matches p_x.
+                    phys[[k, k + 1]] = phys[[k + 1, k]]
 
         # ── Outlier detection during burn-in ──────────────────────────────
         if t in (int(0.25 * t_burnin), int(0.5 * t_burnin),
@@ -1164,18 +933,13 @@ def run_demc(
             for j_out in outliers:
                 X[j_out] = X[best].copy()
                 p_X[j_out] = p_X[best]
-                mol_vals[j_out] = mol_vals[best].copy()
-                nC_vals[j_out] = nC_vals[best].copy()
-                eta_vals[j_out] = eta_vals[best].copy()
+                phys[j_out] = phys[best].copy()
             if outliers and fid is not None:
                 fid.write(f"Chains {outliers} detected as outliers at t={t}. "
                           f"Reset to chain {best}.\n")
 
         # ── Store current state ────────────────────────────────────────────
-        x_chain[t] = X.T
-        mol_chain[t] = mol_vals.T
-        nC_chain_arr[t] = nC_vals.T.astype(float)
-        eta_chain_arr[t] = eta_vals.T
+        phys_chain[t] = phys.T
         p_x[t] = p_X
 
         if t % 10 == 0:
@@ -1184,16 +948,13 @@ def run_demc(
         # ── R-hat convergence check ────────────────────────────────────────
         if t > t_check and t % 2 == 0:
             # Use physical parameter chains for R-hat
-            phys_chain = np.concatenate(
-                [mol_chain, nC_chain_arr, eta_chain_arr], axis=1
-            )
             rhat = _r_hat(phys_chain, t_burnin, t)
 
             # Parameters with structurally constant eta (e.g. n-paraffins):
             # force NaN in storage (gap in plot) and 1.0 in the convergence
             # test (trivially converged — no mixing needed for a fixed param).
             rhat[_rhat_skip] = np.nan
-            R_hat[counter_check] = rhat            
+            R_hat[counter_check] = rhat
 
             # For convergence test: NaN/inf from other discrete params → large
             # sentinel; constant-eta params (already NaN) → 1.0.
@@ -1225,11 +986,7 @@ def run_demc(
 
     # ── Trim arrays to t_convergence ─────────────────────────────────────
     tc = t_convergence
-    x_chain = x_chain[:tc]
-    # Replace normalised mol/nC/eta with physical values
-    x_chain[:, :Nc - 1, :] = mol_chain[:tc]
-    x_chain[:, Nc - 1:2 * Nc - 1, :] = nC_chain_arr[:tc]
-    x_chain[:, 2 * Nc - 1:, :] = eta_chain_arr[:tc]
+    x_chain = phys_chain[:tc]
 
     p_x = p_x[:tc]
     AR = AR[:tc]
