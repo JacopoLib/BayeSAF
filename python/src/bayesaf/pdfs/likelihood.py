@@ -174,7 +174,7 @@ def _h_to_carbon_ratio(
             n_hydrogen += mol_frac_mat[:, j] * (2 * n_all[:, j] - 2)
         elif fam == "alkylbenzenes":
             n_hydrogen += mol_frac_mat[:, j] * (2 * n_all[:, j] - 6)
-        elif fam == "alkylnaphtalenes":
+        elif fam in ("alkylnaphtalenes", "alkylnaphthalenes"):
             n_hydrogen += mol_frac_mat[:, j] * (2 * n_all[:, j] - 12)
         elif fam == "cycloaromatics":
             n_hydrogen += mol_frac_mat[:, j] * (2 * n_all[:, j] - 8)
