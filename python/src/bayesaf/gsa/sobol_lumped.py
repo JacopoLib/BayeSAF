@@ -95,7 +95,7 @@ _H_FORMULA: dict[str, object] = {
     "cycloparaffins": lambda n: 2 * n,
     "dicycloparaffins": lambda n: 2 * n - 2,
     "alkylbenzenes": lambda n: 2 * n - 6,
-    "alkylnaphtalenes": lambda n: 2 * n - 12,
+    "alkylnaphthalenes": lambda n: 2 * n - 12,
     "cycloaromatics": lambda n: 2 * n - 8,
 }
 
