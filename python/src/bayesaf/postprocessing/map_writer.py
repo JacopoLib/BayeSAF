@@ -71,7 +71,8 @@ _NAMES_CSV: dict[str, str] = {
     "cycloparaffins": "cycloparaffins/cycloparaffins_Names.csv",
     "dicycloparaffins": "dicycloparaffins/dicycloparaffins_Names.csv",
     "alkylbenzenes": "alkylbenzenes/alkylbenzenes_Names.csv",
-    "alkylnaphtalenes": "alkylnaphtalenes/alkylnaphtalenes_Names.csv",
+    "alkylnaphtalenes":  "alkylnaphtalenes/alkylnaphtalenes_Names.csv",
+    "alkylnaphthalenes": "alkylnaphtalenes/alkylnaphtalenes_Names.csv",
     "cycloaromatics": "cycloaromatics/cycloaromatics_Names.csv",
 }
 
@@ -84,6 +85,7 @@ _H_FORMULA: dict[str, str] = {
     "dicycloparaffins":    "2n-2",
     "alkylbenzenes":       "2n-6",
     "alkylnaphtalenes":    "2n-12",
+    "alkylnaphthalenes":   "2n-12",
     "cycloaromatics":      "2n-8",
 }
 
@@ -108,14 +110,17 @@ def _n_hydrogen(family: str, nC: int) -> int:
     return 0
 
 
-def _lookup_species_full(family: str, nC: int, eta_B_star: float) -> dict:
+def _lookup_species_full(
+    family: str, nC: int, eta_B_star: float, db_root: "Path | None" = None
+) -> dict:
     """
     Return a dict of all MAP-relevant properties for the best-matching species.
 
     The species is identified as the row in the database CSV whose nC matches
     and whose eta_B_star_norm is closest to *eta_B_star*.
     """
-    df       = pd.read_csv(_DB_ROOT / _FAMILY_CSV[family], sep=";")
+    root     = db_root if db_root is not None else _DB_ROOT
+    df       = pd.read_csv(root / _FAMILY_CSV[family], sep=";")
     nc_rows  = df[df["nC"] == nC]
     if nc_rows.empty:
         return {"name": "Unknown"}
@@ -124,7 +129,7 @@ def _lookup_species_full(family: str, nC: int, eta_B_star: float) -> dict:
     best     = nc_rows.iloc[np.argmin(diff)]
     row_idx  = best.name          # integer label in df
 
-    names_df = pd.read_csv(_DB_ROOT / _NAMES_CSV[family], sep=None, engine="python")
+    names_df = pd.read_csv(root / _NAMES_CSV[family], sep=None, engine="python")
     name     = str(names_df.iloc[row_idx]["Name"])
 
     return {
@@ -173,6 +178,7 @@ def write_map(
     eta_B_star_MAP: np.ndarray,
     fuel_name: str,
     output_file: str = "MAP.txt",
+    data_dir: "Path | str | None" = None,
 ) -> list[str]:
     """
     Write MAP surrogate information to *output_file* (MATLAB-compatible format)
@@ -187,6 +193,10 @@ def write_map(
     eta_B_star_MAP : ndarray, shape (Nc,)
     fuel_name : str
     output_file : str
+    data_dir : path-like, optional
+        Root directory of the CSV database used for name look-up.
+        When provided, overrides the package-level ``_DB_ROOT`` so that
+        a local / restricted database is queried instead of the bundled one.
 
     Returns
     -------
@@ -194,13 +204,14 @@ def write_map(
         Species names of the MAP components.
     """
     Nc = num_components
+    db_root = Path(data_dir) if data_dir is not None else None
 
     # ------------------------------------------------------------------
     # 1. Look up species and collect all properties
     # ------------------------------------------------------------------
     all_props: list[dict] = []
     for k in range(Nc):
-        p = _lookup_species_full(families[k], int(nc_MAP[k]), float(eta_B_star_MAP[k]))
+        p = _lookup_species_full(families[k], int(nc_MAP[k]), float(eta_B_star_MAP[k]), db_root)
         all_props.append(p)
 
     species_names = [p["name"] for p in all_props]
