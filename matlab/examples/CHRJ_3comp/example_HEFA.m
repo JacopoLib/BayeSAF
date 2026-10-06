@@ -53,7 +53,7 @@ addpath('../../../exp/CHRJ_POSF6152')
 %% --- REAL FUEL DATA  --- %%
 
 % CSV files containing the experimental data about the thermophysical properties of the real fuel
-Dataset = {'rho', 'nu', 'distillation', 'deltaT_dist', 'molWeight', 'HC', 'DCN', 'LHV', 'flash', 'freezing'};
+Dataset = {'rho', 'distillation', 'molWeight', 'HC', 'DCN', 'LHV', 'flash'};
 % Plot legend string denoting real fuel experimental data
 fuel_name = 'CHRJ POSF-6152';
 % Bubble temperature of the real fuel [K] (if known, otherwise set it to 1e+18)
@@ -115,31 +115,44 @@ variables_nodist(idx_distillation) = [];
 %% --- DIFFERENTIAL EVOLUTION MARKOV CHAIN (DE-MC) TO EXPLORE POSTERIOR PDF --- %%
 
 % +++ DE-MC parameters +++ %
-maxIterations = 5000; % maximum number of iterations for each chain
-t_burnin = 500; % number of iterations to be discarded as initial burn-in
-t_check = 2*t_burnin; % number of iterations to start R-hat convergence check from
+maxIterations = 20000; % maximum number of iterations for each chain
+t_burnin = 500; % number of iterations of the parallel-tempering phase of the burn-in
 scaling_factor_X = 0.1; % scaling factor for the jump rate concerning molar fractions
 scaling_factor_nc = 1.0; % scaling factor for the jump rate concerning numbers of carbon atoms
 scaling_factor_eta = 1.0; % scaling factor for the jump rate concerning topochemical atom indices
 noise_X = 1e-06; % noise parameter for the surrogate mixture molar fractions
 noise_nc = 1e-06; % noise parameter for the surrogate mixture numbers of carbon atoms
-noise_eta = 1e-06; % noise par puameter for the surrogate mixture topochemical atom indices
+noise_eta = 1e-06; % noise parameter for the surrogate mixture topochemical atom indices
 N_chains = 2*(3*numComponents-1); % number of chains
-outlier_method = 'mad'; % outlier chain detection method: 'iqr' (interquartile range) or 'mad' (median absolute deviation)
-R_hat_threshold = 1.2; % threshold value for the R-hat statistic
 
 % +++ Parallel tempering (PT) parameters +++ %
-PT_switch = 'True'; % use parallel tempering ('True') or not ('False')
-beta_min = 0.0001; % minimum invterse temperature
+beta_min = 0.0001; % minimum inverse temperature
 T_ladder = 'geometric'; % temperature ladder functional form: 'linear' or 'geometric'
 swap_freq = 20; % swap frequency
+n_cold = N_chains/2; % number of chains at beta = 1 after the burn-in
 
 % +++ Proposal parameters +++ %
 n_pairs = 1; % maximum number of chain pairs used to propose the new sample
-p_gibbs = 0.1; % probability of a Gibbs move
+p_gibbs = 0.3; % probability of a Gibbs move
 p_snooker = 0.1; % probability of performing a snooker jump rather than a DE move
+gibbs_tries = 32; % number of tries of the Gibbs move
 
-[chain, posterior_pdf, chain_reshaped, posterior_pdf_reshaped, AR, R_hat, t_convergence]  = DifferentialEvolutionMarkovChain(families, posterior, posterior_cheap, classes, LowerBound_molFrac, UpperBound_molFrac, n_ranges, LowerBound_eta_B_star, UpperBound_eta_B_star, maxIterations, t_burnin, t_check, scaling_factor_X, scaling_factor_nc, scaling_factor_eta, noise_X, noise_nc, noise_eta, N_chains, outlier_method, R_hat_threshold, PT_switch, beta_min, T_ladder, swap_freq, n_pairs, p_gibbs, p_snooker);
+% +++ Convergence criteria +++ %
+rhat_stop = 1.1; % threshold value for the R-hat statistic
+rhat_min_samples = 2000; % minimum number of iterations after the burn-in
+ess_min = 400; % minimum effective sample size of the molar fractions
+
+[chain, posterior_pdf, chain_reshaped, posterior_pdf_reshaped, AR, R_hat, t_convergence, info] = DifferentialEvolutionMarkovChain(families, posterior, posterior_cheap, classes, LowerBound_molFrac, UpperBound_molFrac, n_ranges, LowerBound_eta_B_star, UpperBound_eta_B_star, maxIterations, t_burnin, scaling_factor_X, scaling_factor_nc, scaling_factor_eta, noise_X, noise_nc, noise_eta, N_chains, beta_min, T_ladder, swap_freq, n_pairs, p_gibbs, p_snooker, gibbs_tries, n_cold, rhat_stop, rhat_min_samples, ess_min);
+
+if t_convergence < maxIterations
+    fprintf('DE-MC converged at t = %d (burn-in: %d iterations).\n', t_convergence, info.t_burnin);
+else
+    fprintf('DE-MC did NOT converge at t = %d (burn-in: %d iterations): increase maxIterations.\n', t_convergence, info.t_burnin);
+end
+if ~isempty(R_hat)
+    fprintf('    R-hat max = %.3f\n', max(R_hat(end,:)));
+end
+fprintf('    minimum effective sample size = %.0f\n', info.ESS_min);
 
 %% --- POST-PROCESSING --- %%
 
@@ -152,7 +165,7 @@ species_MAP = MAPwriter(families, numComponents, x_MAP, nc_MAP, eta_B_star_MAP, 
 % Visualize Bayesian inference analysis outcomes
 band_percentiles = 'True'; % 90% confidence interval colored with percentiles ('True') or not ('False')
 confidence_width = 0.95; % 'confidence_width'% confidence interval
-[temperature_range, property_MAP, volumeFraction_MAP, percentiles_list, mean_model, percentiles_model, model_output_samples, volFrac_interp, sobol_idx] = props_pushforward(fullData, families, classes, chain, AR, R_hat, chain_reshaped, t_convergence, t_burnin, n_ranges, numComponents, variable_names, x_MAP, nc_MAP, eta_B_star_MAP, minT_array, maxT_array, pressure_distillation, fuel_name, band_percentiles, confidence_width);
+[temperature_range, property_MAP, volumeFraction_MAP, percentiles_list, mean_model, percentiles_model, model_output_samples, volFrac_interp, sobol_idx] = props_pushforward(fullData, families, classes, chain, AR, R_hat, chain_reshaped, t_convergence, info.t_burnin, n_ranges, numComponents, variable_names, x_MAP, nc_MAP, eta_B_star_MAP, minT_array, maxT_array, pressure_distillation, fuel_name, band_percentiles, confidence_width);
 
 %% --- SAVE VARIABLES FROM WORKSPACE --- %%
 
