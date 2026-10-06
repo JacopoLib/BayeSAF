@@ -64,7 +64,11 @@ from __future__ import annotations
 import numpy as np
 
 from bayesaf.thermo_transport.hydrocarbons import Species
-from bayesaf.thermo_transport.properties import liquid_property, mixture_property
+from bayesaf.thermo_transport.properties import (
+    _liquid_property_cached,
+    liquid_property,
+    mixture_property,
+)
 from bayesaf.utilities.composition import mol_to_mass
 from bayesaf.utilities.find_index import find_index_eta
 from bayesaf.distillation.distillation_curve import (
@@ -260,7 +264,7 @@ def log_likelihood(
                 sp = classes[j][index_n_eta[k, j]]
                 W_mat[k, j] = sp.mol_weight
                 dcn_mat[k, j] = sp.DCN
-                rho_mat[k, j] = liquid_property("rho", 300.0, sp, pressure)
+                rho_mat[k, j] = _liquid_property_cached("rho", 300.0, sp, pressure)
         rho_mix = (mol_frac_mat * W_mat).sum(axis=1) / ((mol_frac_mat * W_mat) / rho_mat).sum(axis=1)
         Y_i = np.array([mol_to_mass(mol_frac_mat[k], W_mat[k]) for k in range(N_samples)])
         V_i = rho_mix[:, np.newaxis] * Y_i / rho_mat
@@ -309,7 +313,7 @@ def log_likelihood(
             for k in range(N_samples):
                 sp = classes[j][index_n_eta[k, j]]
                 W_mat[k, j] = sp.mol_weight
-                rho_mat[k, j] = liquid_property("rho", 300.0, sp, pressure)
+                rho_mat[k, j] = _liquid_property_cached("rho", 300.0, sp, pressure)
                 bi_freeze[k, j] = sp.Tfz ** (1.0 / 0.05)
         rho_mix = (mol_frac_mat * W_mat).sum(axis=1) / ((mol_frac_mat * W_mat) / rho_mat).sum(axis=1)
         Y_i = np.array([mol_to_mass(mol_frac_mat[k], W_mat[k]) for k in range(N_samples)])
