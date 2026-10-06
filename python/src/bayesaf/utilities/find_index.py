@@ -62,9 +62,9 @@ import numpy as np
 from bayesaf.thermo_transport.hydrocarbons import Species
 
 
-# Module-level cache: id(species_list) → (nC_arr, eta_arr)
-# Species lists are created once per run and never mutated, so id() is stable.
-_SPECIES_CACHE: dict[int, tuple[np.ndarray, np.ndarray]] = {}
+# Module-level cache: id(species_list) -> (species_list, {nC: (indices, eta)}, memo)
+_SPECIES_CACHE: dict[int, tuple[list, dict, dict]] = {}
+_MEMO_MAX = 200_000
 
 
 def find_index_eta(species_list: list[Species], nC: int, eta_B_star: float) -> int:
@@ -85,14 +85,24 @@ def find_index_eta(species_list: list[Species], nC: int, eta_B_star: float) -> i
     int
         0-based index into *species_list*.
     """
-    key = id(species_list)
-    if key not in _SPECIES_CACHE:
-        _SPECIES_CACHE[key] = (
-            np.array([sp.nC for sp in species_list], dtype=int),
-            np.array([sp.eta_B_star_norm for sp in species_list], dtype=float),
-        )
-    nC_arr, eta_arr = _SPECIES_CACHE[key]
-
-    filtered = np.where(nC_arr == nC)[0]
-    diffs = np.abs(eta_arr[filtered] - eta_B_star)
-    return int(filtered[np.argmin(diffs)])
+    entry = _SPECIES_CACHE.get(id(species_list))
+    if entry is None or entry[0] is not species_list:
+        entry = (species_list, {}, {})
+        _SPECIES_CACHE[id(species_list)] = entry
+    _, by_nc, memo = entry
+    key = (int(nC), float(eta_B_star))
+    idx = memo.get(key)
+    if idx is not None:
+        return idx
+    sub = by_nc.get(key[0])
+    if sub is None:
+        nC_arr = np.array([sp.nC for sp in species_list], dtype=int)
+        eta_arr = np.array([sp.eta_B_star_norm for sp in species_list], dtype=float)
+        filtered = np.where(nC_arr == key[0])[0]
+        sub = by_nc[key[0]] = (filtered, eta_arr[filtered])
+    filtered, eta_sub = sub
+    idx = int(filtered[np.argmin(np.abs(eta_sub - eta_B_star))])
+    if len(memo) >= _MEMO_MAX:
+        memo.clear()
+    memo[key] = idx
+    return idx
