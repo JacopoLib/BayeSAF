@@ -33,8 +33,10 @@ algorithm proposed by ter Braak (2006) to explore and sample from the
 posterior probability density function (PDF). The implementation is adapted
 from the DiffeRential Evolution Adaptive Metropolis (DREAM) toolbox developed
 by Vrugt et al. (2008, 2009, 2016). It supports parallel tempering, delayed
-acceptance, snooker jumps, blocked updates, and outlier-chain detection.
-Convergence is monitored via the R-hat Gelman-Rubin statistic.
+acceptance, snooker jumps, blocked updates, an exact multiple-try Gibbs move
+on carbon atoms and isomers with a uniform prior over isomers, and an adaptive
+burn-in with outlier-chain resets. Convergence is monitored via the classic
+Gelman-Rubin R-hat statistic and the effective sample size.
 
 References:
 ter Braak, C.J.F. (2006). A Markov chain Monte Carlo version of the genetic
@@ -42,6 +44,13 @@ algorithm differential evolution: easy Bayesian computing for real parameter
 spaces. Stat. Comput. 16, 239-249.
 
 Vrugt, J.A. et al. (2008, 2009, 2016). DREAM toolbox.
+
+Liu, J.S., Liang, F., Wong, W.H. (2000). The multiple-try method and local
+optimization in Metropolis sampling. J. Am. Stat. Assoc. 95, 121-134.
+
+Vehtari, A., Gelman, A., Simpson, D., Carpenter, B., Bürkner, P.-C. (2021).
+Rank-normalization, folding, and localization: an improved R-hat for
+assessing convergence of MCMC. Bayesian Anal. 16, 667-718.
 
 Auxiliary parameters:
 Nc: number of surrogate mixture components  [-]
@@ -62,24 +71,33 @@ Inputs:
 9) UpperBound_eta_B_star: (1 x Nc) array with upper bounds for normalised
                           topochemical atom indices
 10) maxIterations       : maximum number of iterations for each chain
-12) t_burnin            : number of iterations to discard as burn-in
-13) t_check             : iteration from which to start the R-hat check
-14) scaling_factor_X    : jump-rate scaling for molar fractions
-15) scaling_factor_nc   : jump-rate scaling for numbers of carbon atoms
-16) scaling_factor_eta  : jump-rate scaling for topochemical atom indices
-17) noise_X             : noise parameter for molar-fraction proposals
-18) noise_nc            : noise parameter for carbon-atom proposals
-19) noise_eta           : noise parameter for topochemical-index proposals
-20) N_chains            : number of chains
-21) outlier_method      : outlier-chain detection method ('iqr' or 'mad')
-22) R_hat_threshold     : R-hat convergence threshold
-23) PT_switch           : use parallel tempering ('True') or not ('False')
-24) beta_min            : minimum inverse temperature for parallel tempering
-25) T_ladder            : temperature ladder form ('linear' or 'geometric')
-26) swap_freq           : parallel tempering swap frequency
-27) n_pairs             : maximum number of chain pairs used to propose the new sample
-28) p_gibbs             : probability of a Gibbs move
-29) p_snooker           : probability of a snooker jump
+11) t_burnin            : number of iterations of the parallel-tempering phase
+                          of the burn-in
+12) scaling_factor_X    : jump-rate scaling for molar fractions
+13) scaling_factor_nc   : jump-rate scaling for numbers of carbon atoms
+14) scaling_factor_eta  : jump-rate scaling for topochemical atom indices
+15) noise_X             : noise parameter for molar-fraction proposals
+16) noise_nc            : noise parameter for carbon-atom proposals
+17) noise_eta           : noise parameter for topochemical-index proposals
+18) N_chains            : number of chains
+19) beta_min            : minimum inverse temperature during the burn-in
+20) T_ladder            : temperature ladder form ('linear' or 'geometric')
+21) swap_freq           : parallel tempering swap frequency during the burn-in
+22) n_pairs             : maximum number of chain pairs used to propose the new sample
+23) p_gibbs             : probability of a Gibbs move
+24) p_snooker           : probability of a snooker jump
+25) gibbs_tries         : number of tries of the multiple-try Gibbs move
+                          (None: enumeration of all candidates)
+26) n_cold              : number of chains at beta = 1 after the burn-in
+27) beta_min_sampling   : minimum inverse temperature after the burn-in
+28) swap_every_sampling : parallel tempering swap frequency after the burn-in
+29) outlier_every       : iterations between two outlier-chain checks
+30) burnin_cap          : maximum burn-in length, as a fraction of maxIterations
+31) rhat_stop           : R-hat convergence threshold
+32) rhat_checks         : number of consecutive R-hat checks below rhat_stop
+33) rhat_spacing        : iterations between two R-hat checks
+34) rhat_min_samples    : minimum number of post-burn-in iterations
+35) ess_min             : minimum effective sample size of the molar fractions
 
 Outputs:
 1) x            : (t_convergence x 3*Nc-1 x N_chains) array of posterior
@@ -89,7 +107,7 @@ Outputs:
                   x 3*Nc-1)
 4) p_x_nb       : post-burnin log-posterior values
 5) AR            : (t_convergence x N_chains) acceptance rate array
-6) R_hat         : R-hat statistic array, shape
+6) R_hat         : classic R-hat statistic array, shape
                    (floor((t_convergence-t_burnin)/2) x 3*Nc-1)
 7) t_convergence : iteration at which convergence was declared (or
                    maxIterations if convergence was not reached)
@@ -209,291 +227,72 @@ def _mt_randn_vec(rng: np.random.RandomState, n: int) -> np.ndarray:
 # Convergence diagnostics
 # ---------------------------------------------------------------------------
 
-def _r_hat(
-    chains: np.ndarray,   # (T, n_params, N_chains)
-    t_burnin: int,
-    t: int,
-) -> np.ndarray:
-    """Compute Gelman-Rubin R-hat for each parameter.
-
-    Uses the same formula as the MATLAB implementation:
-      x_j_r_bar = 2/(T_eff-2) * sum(x_sel, axis=time)
-    instead of the plain sample mean, with matching W/B/sigma coefficients.
-    The slice includes the current sample at index t (matching MATLAB's 1-indexed
-    x_rhat(idx_start:t, :, :) which includes row t).
-    """
+def _r_hat_classic(chains: np.ndarray, t_burnin: int, t: int) -> np.ndarray:
+    """Classic Gelman-Rubin R-hat (plain chain means) over the second half of [t_burnin, t]."""
     idx_start = t_burnin + (t - t_burnin) // 2
-    x_sel = chains[idx_start : t + 1]       # (T_eff, n_params, N_chains) — includes row t
-    T_eff, n_params, N_chains = x_sel.shape
-
-    if T_eff <= 2:
-        return np.full(n_params, np.nan)
-
-    # Chain "centre" — matches MATLAB: x_j_r_bar = 2/(T_eff-2) * sum(x_sel, 1)
-    x_j_bar = (2.0 / (T_eff - 2)) * x_sel.sum(axis=0)   # (n_params, N_chains)
-    x_bar_bar = x_j_bar.mean(axis=1, keepdims=True)       # (n_params, 1)
-
-    # Within-chain variance
-    W = ((x_sel - x_j_bar[np.newaxis]) ** 2).sum(axis=(0, 2)) / (N_chains * (T_eff - 2)) * 2
-
-    # Between-chain variance
-    B = T_eff / (2 * (N_chains - 1)) * ((x_j_bar - x_bar_bar) ** 2).sum(axis=1)
-
-    sigma = ((T_eff - 2) / T_eff) * W + (2 / T_eff) * B
+    x = chains[idx_start: t + 1]              # (n, n_params, N_chains)
+    n = x.shape[0]
+    if n <= 2:
+        return np.full(x.shape[1], np.nan)
+    W = x.var(axis=0, ddof=1).mean(axis=1)
+    B = n * x.mean(axis=0).var(axis=1, ddof=1)
     with np.errstate(divide="ignore", invalid="ignore"):
-        r = np.sqrt(((N_chains + 1) / N_chains) * sigma / W - (T_eff - 2) / (N_chains * T_eff))
-    # W=0 → parameter constant across all chains (common for discrete nC early
-    # in the chain).  Return NaN so plots show gaps; callers use the sentinel
-    # version for convergence testing.
-    return r
+        return np.sqrt(((n - 1) / n * W + B / n) / W)
 
 
-def _detect_outliers(
-    p_x: np.ndarray,   # (t_current, N_chains)
-    t: int,
-    method: str,
-) -> list[int]:
-    """Return indices of outlier chains."""
-    half = max(1, t // 2)
-    omega = p_x[half:t].mean(axis=0)    # mean posterior per chain
-    outliers = []
-    if method == "mad":
-        med = np.median(omega)
-        mad = 1.4826 * np.median(np.abs(omega - med))
-        for j in range(len(omega)):
-            if omega[j] < med - 3 * mad:
-                outliers.append(j)
-    elif method == "iqr":
-        q1, q3 = np.percentile(omega, [25, 75])
-        iqr = q3 - q1
-        for j in range(len(omega)):
-            if omega[j] < q1 - 1.5 * iqr:
-                outliers.append(j)
-    return outliers
+def _ess_bulk(draws: np.ndarray) -> float:
+    """Bulk effective sample size of draws (n_iterations, n_chains) (Vehtari et al., 2021)."""
+    from scipy.stats import norm, rankdata
+    d = np.asarray(draws, dtype=float)
+    if np.allclose(d, d.flat[0]):
+        return float("inf")
+    d = norm.ppf((rankdata(d, method="average").reshape(d.shape) - 0.375) / (d.size + 0.25))
+    n = d.shape[0] // 2
+    d = np.hstack([d[:n], d[n:2 * n]])
+    m = d.shape[1]
+    x = d - d.mean(0)
+    f = np.fft.rfft(x, n=2 * n, axis=0)
+    acov = np.fft.irfft(f * np.conj(f), axis=0)[:n] / n          # (n, m)
+    W = (acov[0] * n / (n - 1)).mean(); B = n * d.mean(0).var(ddof=1)
+    var_plus = (n - 1) / n * W + B / n
+    rho = 1.0 - (W - acov.mean(1)) / var_plus
+    rho[0] = 1.0
+    P = rho[:-1:2] + rho[1::2]
+    k = int(np.argmax(P < 0)) if np.any(P < 0) else len(P)
+    P = np.minimum.accumulate(P[:k]) if k > 0 else np.array([1.0])
+    tau = -1.0 + 2.0 * P.sum()
+    return float(m * n / max(tau, 1.0 / np.log10(m * n)))
 
 
 # ---------------------------------------------------------------------------
-# Gibbs moves
+# Prior over isomers
 # ---------------------------------------------------------------------------
 
-def _build_gibbs_candidates(
-    *,
-    i: int,
-    t: int,
-    t_burnin: int,
-    Nc: int,
-    N_chains: int,
-    components: np.ndarray,
-    classes: list[list[Species]],
-    n_ranges_list: list[list[int]],
-    mol_temp: np.ndarray,
-    nC_temp: np.ndarray,
-    eta_temp: np.ndarray,
-    nC_vals: np.ndarray,
-    eta_vals: np.ndarray,
-    max_comb: int | float,
-    rng: np.random.RandomState,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Replicate the MATLAB Gibbs candidate construction more closely.
+def _uniform_isomer_prior(layout, posterior_fn, posterior_cheap_fn):
+    """Posteriors with a uniform prior over the isomers of each component given
+    its number of carbon atoms, in place of the decoder-cell measure."""
+    unit = layout.units[0]
+    table = []                                   # per component: {(nC, eta): log correction}
+    for k in range(unit.Nc):
+        corr = {}
+        for nC in unit.n_ranges[k]:
+            cells = {e: m for e, (m, _) in unit.eta_cells(k, int(nC)).items() if m > 0}
+            for e, m in cells.items():
+                corr[(float(nC), e)] = -np.log(len(cells)) - np.log(m)
+        table.append(corr)
 
-    Returns
-    -------
-    mol_all, nC_all, eta_all
-        Candidate states to score with posterior_cheap_fn.
-    """
-    n_comp_update = len(components)
+    def correction(nC, eta):
+        out = np.zeros(nC.shape[0])
+        for r in range(nC.shape[0]):
+            for k in range(unit.Nc):
+                out[r] += table[k].get((float(nC[r, k]), float(eta[r, k])), -np.inf)
+        return out
 
-    pair_lists = []
-    cur_idxs = []
-
-    # MATLAB uses NBH = Inf and maxSamples = Inf*100 in the shared file,
-    # so practically it keeps all local pairs.
-    for cc in range(n_comp_update):
-        j_comp = int(components[cc])
-        sp_list = classes[j_comp]
-        n_rng = n_ranges_list[j_comp]
-
-        pair_list = []
-        for nC_cand in n_rng:
-            eta_norm_list = [sp.eta_B_star_norm for sp in sp_list if sp.nC == nC_cand]
-            if len(eta_norm_list) == 0:
-                continue
-            for eta_cand in eta_norm_list:
-                pair_list.append([nC_cand, eta_cand])
-
-        pair_list = np.asarray(pair_list, dtype=float)
-
-        cur_pair = np.array([nC_temp[j_comp], eta_temp[j_comp]], dtype=float)
-        if pair_list.size == 0:
-            pair_list = cur_pair[None, :]
-            cur_idx = 0
-        else:
-            cur_rows = np.where(np.all(np.isclose(pair_list, cur_pair), axis=1))[0]
-            if len(cur_rows) == 0:
-                pair_list = np.vstack([pair_list, cur_pair])
-                cur_idx = len(pair_list) - 1
-            else:
-                cur_idx = int(cur_rows[0])
-
-        # MATLAB adds donor pairs to the per-component list after burn-in
-        if t > t_burnin:
-            donor_pairs = np.column_stack([
-                nC_vals[np.arange(N_chains) != i, j_comp],
-                eta_vals[np.arange(N_chains) != i, j_comp],
-            ])
-            if donor_pairs.size > 0:
-                pair_list = np.vstack([pair_list, donor_pairs])
-                pair_list = np.unique(pair_list, axis=0)
-
-            # recompute current index after dedup/reorder
-            cur_rows = np.where(np.all(np.isclose(pair_list, cur_pair), axis=1))[0]
-            cur_idx = int(cur_rows[0])
-
-        pair_lists.append(pair_list)
-        cur_idxs.append(cur_idx)
-
-    # ---------- Cartesian product with MATLAB-like stratified truncation ----------
-    num_comb_each = [pl.shape[0] for pl in pair_lists]
-    n_comb_full = int(np.prod(num_comb_each)) if len(num_comb_each) > 0 else 1
-
-    if np.isfinite(max_comb) and n_comb_full > max_comb:
-        idx_sub = []
-        targ = max(1, int(np.ceil(max_comb ** (1.0 / n_comp_update))))
-
-        for cc in range(n_comp_update):
-            P = pair_lists[cc]
-            n = P.shape[0]
-            inc = cur_idxs[cc]
-
-            if n <= targ:
-                idx_sub.append(np.arange(n, dtype=int))
-                continue
-
-            # Group by nC as in MATLAB
-            nC_vals_cc = P[:, 0]
-            nC_unique, grp = np.unique(nC_vals_cc, return_inverse=True)
-            G = len(nC_unique)
-            targ_cc = min(n, max(targ, G))
-
-            rows_by_grp = [np.where(grp == g)[0] for g in range(G)]
-
-            selected = []
-            # one random row per nC group
-            for rows in rows_by_grp:
-                selected.append(int(rows[rng.randint(len(rows))]))
-
-            # ensure current included
-            if inc not in selected:
-                g_inc = grp[inc]
-                repl = next((k for k, idx in enumerate(selected) if grp[idx] == g_inc), None)
-                if repl is not None:
-                    selected[repl] = inc
-                else:
-                    selected.append(int(inc))
-
-            # fill remaining quota round-robin
-            rem_by_grp = []
-            for rows in rows_by_grp:
-                rem = np.array([r for r in rows if r not in selected], dtype=int)
-                if len(rem) > 0:
-                    rem = rem[rng.permutation(len(rem))]
-                rem_by_grp.append(rem)
-
-            g_ptr = np.ones(G, dtype=int) * 0
-            while len(selected) < targ_cc:
-                progressed = False
-                for g in range(G):
-                    if len(selected) >= targ_cc:
-                        break
-                    if g_ptr[g] < len(rem_by_grp[g]):
-                        selected.append(int(rem_by_grp[g][g_ptr[g]]))
-                        g_ptr[g] += 1
-                        progressed = True
-                if not progressed:
-                    break
-
-            idx_sub.append(np.asarray(selected, dtype=int))
-    else:
-        idx_sub = [np.arange(pl.shape[0], dtype=int) for pl in pair_lists]
-
-    grids = np.meshgrid(*idx_sub, indexing="ij")
-    flat = [g.ravel() for g in grids]
-    idx_pairs = np.column_stack(flat) if len(flat) > 1 else flat[0][:, None]
-    n_comb = idx_pairs.shape[0]
-
-    mol_all = np.tile(mol_temp, (n_comb, 1))
-    nC_all = np.tile(nC_temp, (n_comb, 1)).astype(float)
-    eta_all = np.tile(eta_temp, (n_comb, 1))
-
-    for cc in range(n_comp_update):
-        j_comp = int(components[cc])
-        P = pair_lists[cc]
-        nC_all[:, j_comp] = P[idx_pairs[:, cc], 0]
-        eta_all[:, j_comp] = P[idx_pairs[:, cc], 1]
-
-    # ---------- ensure current joint state exists ----------
-    cur_idx_each = np.asarray(cur_idxs, dtype=int)
-    if n_comp_update == 1:
-        cur_idx_in_grid = int(cur_idx_each[0])
-    else:
-        matches = np.where(np.all(idx_pairs == cur_idx_each[None, :], axis=1))[0]
-        if len(matches) == 0:
-            cur_idx_in_grid = n_comb
-            mol_all = np.vstack([mol_all, mol_temp[None, :]])
-            nC_all = np.vstack([nC_all, nC_temp[None, :].astype(float)])
-            eta_all = np.vstack([eta_all, eta_temp[None, :]])
-        else:
-            cur_idx_in_grid = int(matches[0])
-
-    # ---------- after burn-in append other chains' full joint states ----------
-    if t > t_burnin:
-        other_idx = np.where(np.arange(N_chains) != i)[0]
-        if len(other_idx) > 0:
-            donor_mol = np.tile(mol_temp, (len(other_idx), 1))
-            donor_nC = nC_vals[other_idx].astype(float)
-            donor_eta = eta_vals[other_idx].copy()
-
-            mol_all = np.vstack([mol_all, donor_mol])
-            nC_all = np.vstack([nC_all, donor_nC])
-            eta_all = np.vstack([eta_all, donor_eta])
-
-            idx_all_states = np.arange(len(mol_all) - len(other_idx), len(mol_all), dtype=int)
-        else:
-            idx_all_states = np.array([], dtype=int)
-
-        n_comb = len(mol_all)
-        if np.isfinite(max_comb) and n_comb > max_comb:
-            mandatory = np.unique(np.concatenate([[cur_idx_in_grid], idx_all_states]))
-            n_free = max(0, int(max_comb) - len(mandatory))
-
-            pool = np.setdiff1d(np.arange(n_comb, dtype=int), mandatory, assume_unique=False)
-            if n_free > 0 and len(pool) > 0:
-                take = rng.permutation(pool)[: min(n_free, len(pool))]
-                idx_keep = np.unique(np.concatenate([mandatory, take]))
-            else:
-                idx_keep = mandatory
-
-            mol_all = mol_all[idx_keep]
-            nC_all = nC_all[idx_keep]
-            eta_all = eta_all[idx_keep]
-    else:
-        n_comb = len(mol_all)
-        if np.isfinite(max_comb) and n_comb > max_comb:
-            mandatory = np.array([cur_idx_in_grid], dtype=int)
-            n_free = max(0, int(max_comb) - len(mandatory))
-            pool = np.setdiff1d(np.arange(n_comb, dtype=int), mandatory, assume_unique=False)
-            if n_free > 0 and len(pool) > 0:
-                take = rng.permutation(pool)[: min(n_free, len(pool))]
-                idx_keep = np.unique(np.concatenate([mandatory, take]))
-            else:
-                idx_keep = mandatory
-
-            mol_all = mol_all[idx_keep]
-            nC_all = nC_all[idx_keep]
-            eta_all = eta_all[idx_keep]
-
-    return mol_all, nC_all, eta_all
+    def wrap(f):
+        def g(X, nC, eta):
+            return f(X, nC, eta) + correction(nC, eta)
+        return g
+    return wrap(posterior_fn), wrap(posterior_cheap_fn)
 
 
 # ---------------------------------------------------------------------------
@@ -512,7 +311,6 @@ def run_demc(
     upper_bound_eta: np.ndarray,
     max_iterations: int,
     t_burnin: int,
-    t_check: int,
     scaling_factor_x: float,
     scaling_factor_nc: float | np.ndarray,
     scaling_factor_eta: float,
@@ -520,9 +318,6 @@ def run_demc(
     noise_nc: float,
     noise_eta: float,
     N_chains: int,
-    outlier_method: str = "mad",
-    R_hat_threshold: float = 1.1,
-    PT_switch: str = "True",
     beta_min: float = 0.0001,
     T_ladder: str = "geometric",
     swap_freq: int = 20,
@@ -533,14 +328,48 @@ def run_demc(
     seed: int = 1234,
     x_init: np.ndarray | None = None,
     layout: ParameterLayout | None = None,
+    info: dict | None = None,
+    gibbs_tries: int | None = None,
+    n_cold: int | None = None,
+    beta_min_sampling: float = 0.05,
+    swap_every_sampling: int = 1,
+    outlier_every: int | None = None,
+    burnin_cap: float = 0.75,
+    rhat_stop: float = 1.1,
+    rhat_checks: int = 3,
+    rhat_spacing: int = 500,
+    rhat_min_samples: int = 2000,
+    ess_min: float = 400,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
     """
     Run the DE-MC algorithm with delayed acceptance and parallel tempering.
 
-    Parameters mirror the MATLAB function signature exactly, plus ``layout``:
-    a ParameterLayout describing the state vector. If None, the standard
-    single-surrogate SurrogateLayout (3*Nc-1 parameters) is built from
-    classes, n_ranges and the molar-fraction bounds.
+    Parameters mirror the MATLAB function signature, plus the optional
+    arguments below.
+
+    layout : ParameterLayout describing the state vector. If None, the
+        standard SurrogateLayout (3*Nc-1 parameters) is built from classes,
+        n_ranges and the molar-fraction bounds.
+    info : dict receiving t_burnin, n_resets, swap_rates, betas and
+        ESS_min_at_stop.
+    gibbs_tries : number of uniform tries of the multiple-try Gibbs move on
+        the (nC, eta) of one component; None enumerates all the candidates.
+        The molar fractions first take a symmetric DE jump.
+    n_cold, beta_min_sampling, swap_every_sampling : parallel tempering after
+        the burn-in. The first n_cold chains (default N_chains // 2) stay at
+        beta = 1 and are the only ones returned.
+    outlier_every, burnin_cap : burn-in. Parallel tempering up to t_burnin;
+        then, every outlier_every iterations, the chains whose mean
+        log-posterior lies more than 5*sqrt(n_params/2) below the best chain
+        are reset to good chains drawn at random. The burn-in ends at the
+        first check without resets after 2*t_burnin, or at
+        burnin_cap*max_iterations.
+    rhat_stop, rhat_checks, rhat_spacing, rhat_min_samples, ess_min : the run
+        stops once the classic Gelman-Rubin R-hat is below rhat_stop at
+        rhat_checks checks rhat_spacing iterations apart, after at least
+        rhat_min_samples post-burn-in iterations, and the bulk effective
+        sample size (Vehtari et al., 2021) of every molar fraction is at
+        least ess_min.
 
     Returns
     -------
@@ -556,20 +385,20 @@ def run_demc(
     AR : ndarray, shape (t_conv, N_chains)
         Acceptance rates (%).
     R_hat : ndarray, shape (n_checks, n_params)
-        R-hat statistics.
+        Classic R-hat statistics, every 2 iterations after the burn-in.
     t_convergence : int
         Iteration at which convergence was declared.
     """
     rng = np.random.RandomState(seed)  # MT19937 — matches MATLAB rng(seed,'twister')
     if layout is None:
         layout = SurrogateLayout(classes, n_ranges, lower_bound_x, upper_bound_x)
+    posterior_fn, posterior_cheap_fn = _uniform_isomer_prior(layout, posterior_fn, posterior_cheap_fn)
     n_params = layout.n_params
-    n_units = len(layout.units)
 
     # Start a persistent worker pool.  Passing *classes* to the initializer
     # pre-loads the species database in each worker so it is not re-pickled
     # on every pool.map() call.
-    init_pool(classes=classes)
+    init_pool(classes=classes, batch_size=N_chains, nc=len(classes))
 
     fid = open(log_file, "w") if log_file is not None else None
     _hdr = (
@@ -610,6 +439,8 @@ def run_demc(
     accept_arr = np.full((max_iterations, N_chains), np.nan)
     AR = np.full((max_iterations, N_chains), np.nan)
     R_hat = np.full((max_iterations // 2, n_params), 1e18)
+    rc_hist: dict = {}            # t -> max classic R-hat
+    _ess_cols = sorted(int(c) for u in layout.units for c in u.frac_cols)
     x_archive = np.zeros((max_iterations, n_params, N_chains))
 
     # ── Initialise population ───────────────────────────────────────────────
@@ -629,20 +460,36 @@ def run_demc(
     # R-matrix: each chain's "other chains" indices
     R_mat = np.array([np.delete(np.arange(N_chains), i) for i in range(N_chains)])
 
-    # Temperature ladder
-    if PT_switch == "True":
-        if T_ladder == "linear":
-            beta_arr = np.linspace(1.0, beta_min, N_chains)
-        else:
-            beta_arr = beta_min ** (np.arange(N_chains) / (N_chains - 1))
-            beta_arr = np.sort(beta_arr)[::-1]
+    # Parallel tempering after the burn-in: cold group + hot ladder
+    n_cold = n_cold or N_chains // 2
+    n_hot = N_chains - n_cold
+    if n_cold < 4 or n_hot < 4:
+        raise ValueError("at least 4 cold and 4 hot chains are needed")
+    beta_prod = np.concatenate([np.ones(n_cold),
+                                beta_min_sampling ** (np.arange(1, n_hot + 1) / n_hot)])
+    cold_idx = np.arange(n_cold)
+    group_of = np.where(np.arange(N_chains) < n_cold, 0, 1)
+    groups = [cold_idx, np.arange(n_cold, N_chains)]
+    swap_try = np.zeros(n_hot)
+    swap_acc = np.zeros(n_hot)
+
+    # Temperature ladder during the burn-in
+    if T_ladder == "linear":
+        beta_arr = np.linspace(1.0, beta_min, N_chains)
     else:
-        beta_arr = np.ones(N_chains)
-        swap_freq = max_iterations + 1  # effectively disable swaps
+        beta_arr = beta_min ** (np.arange(N_chains) / (N_chains - 1))
+        beta_arr = np.sort(beta_arr)[::-1]
 
     convergence = False
     t_convergence = max_iterations
     counter_check = 0
+
+    # Effective burn-in
+    t_burn = t_burnin
+    burnin_done = False
+    n_resets = 0
+    every = outlier_every or max(50, t_burnin // 4)
+    margin_best = 5.0 * np.sqrt(n_params / 2.0)
 
     # ── R-hat skip mask ───────────────────────────────────────────────────────
     # Parameters whose value is structurally constant across all chains
@@ -666,7 +513,11 @@ def run_demc(
     for _iter in range(1, max_iterations):
         t = _iter
 
-        if t > t_burnin:
+        in_prod = burnin_done
+        if in_prod:
+            beta_arr = beta_prod
+            swap_freq_eff = max_iterations + 1
+        elif t > t_burnin:
             beta_arr = np.ones(N_chains)
             swap_freq_eff = max_iterations + 1
         else:
@@ -681,6 +532,7 @@ def run_demc(
         J = np.zeros(N_chains)
         log_pi1_x_vec = np.zeros(N_chains)
         log_pi1_y_vec = np.zeros(N_chains)
+        stage1_override = np.full(N_chains, np.nan)   # Gibbs move: log alpha1
 
         # ── Per-chain proposal ─────────────────────────────────────────────
         for i in range(N_chains):
@@ -689,11 +541,93 @@ def run_demc(
             Xp_temp = Xp[i].copy()
             phys_temp = phys[i].copy()
 
+            # ── Gibbs move on one component's (nC, eta) ───────────────────
+            if r_gibbs <= p_gibbs:
+                unit = layout.units[0]
+                k = rng.randint(0, unit.Nc)
+                cn, ce = unit.nc_cols[k], unit.eta_cols[k]
+                cx = posterior_cheap_fn(*layout.posterior_args(phys[i:i + 1]))[0]
+                moved = False
+                if len(unit.frac_cols) > 0:
+                    # Symmetric DE jump of the unit's molar fractions, x -> x'
+                    if in_prod:
+                        partners = groups[group_of[i]][groups[group_of[i]] != i]
+                        pick = partners[rng.permutation(len(partners))[:2]]
+                        a1, b1 = pick[:1], pick[1:2]
+                    else:
+                        a1, b1 = R_mat[i][draw[:1, i]], R_mat[i][draw[1:2, i]]
+                    g1 = scaling_factor_x * 2.38 / np.sqrt(2 * len(unit.frac_cols))
+                    g1 = g1 if rng.random_sample() < 0.9 else 1.0
+                    for j in unit.frac_cols:
+                        Xp_temp[j] = (X[i, j] + (1 - lambda_vec[i]) * g1 * np.sum(X[a1, j] - X[b1, j])
+                                      + noise_x * _mt_randn(rng))
+                    unit.fold_fractions(Xp_temp, phys_temp)
+                    moved = True
+                    if not unit.fractions_sum_ok(phys_temp):
+                        stage1_override[i] = -np.inf
+                        Xp[i], phys_new[i] = Xp_temp, phys_temp
+                        continue
+                if gibbs_tries is None:
+                    cand = unit.candidates(k)
+                    rows = np.tile(phys_temp, (len(cand), 1))
+                    rows[:, cn], rows[:, ce] = cand[:, 0], cand[:, 1]
+                    cu = posterior_cheap_fn(*layout.posterior_args(rows))
+                    lcell = layout.log_cell(rows)
+                    lw = cu + lcell
+                    if moved:
+                        rows_r = np.tile(phys[i], (len(cand), 1))
+                        rows_r[:, cn], rows_r[:, ce] = cand[:, 0], cand[:, 1]
+                        lw_r = posterior_cheap_fn(*layout.posterior_args(rows_r)) + lcell
+                    finite = np.isfinite(lw)
+                    if finite.any():
+                        m_f = lw[finite].max()
+                        w = np.where(finite, np.exp(lw - m_f), 0.0)
+                        sel = int(rng.choice(len(w), p=w / w.sum()))
+                        phys_temp[cn], phys_temp[ce] = cand[sel]
+                        Xp_temp[cn], Xp_temp[ce] = unit.sample_u(k, cand[sel, 0], cand[sel, 1], rng)
+                        log_pi1_y_vec[i], log_pi1_x_vec[i] = cu[sel], cx
+                        a1_log = (beta_arr[i] - 1.0) * (cu[sel] - cx)
+                        if moved:
+                            fr = np.isfinite(lw_r)
+                            log_z_f = m_f + np.log(w.sum())
+                            log_z_r = (lw_r[fr].max() + np.log(np.sum(np.exp(lw_r[fr] - lw_r[fr].max())))
+                                       if fr.any() else np.inf)
+                            a1_log += log_z_f - log_z_r
+                        stage1_override[i] = a1_log
+                    else:
+                        stage1_override[i] = -np.inf
+                else:
+                    kt = int(gibbs_tries)
+                    def _tries(us, base):
+                        rows = np.tile(base, (len(us), 1))
+                        for r, (a, b) in enumerate(us):
+                            rows[r, cn], rows[r, ce] = unit.decode_component(k, a, b)
+                        return rows, posterior_cheap_fn(*layout.posterior_args(rows))
+                    u_c = rng.random_sample((kt, 2))
+                    rows_c, cu_c = _tries(u_c, phys_temp)   # tries at x'
+                    lw_c = beta_arr[i] * cu_c
+                    if np.isfinite(lw_c).any():
+                        m = lw_c[np.isfinite(lw_c)].max()
+                        w = np.where(np.isfinite(lw_c), np.exp(lw_c - m), 0.0)
+                        sel = int(rng.choice(kt, p=w / w.sum()))
+                        u_r = np.vstack([rng.random_sample((kt - 1, 2)), [[X[i, cn], X[i, ce]]]])
+                        _, cu_r = _tries(u_r[:-1], phys[i])   # references at x
+                        lw_r = beta_arr[i] * np.append(cu_r, cx)
+                        m_r = lw_r[np.isfinite(lw_r)].max()
+                        log_sum_c = m + np.log(w.sum())
+                        log_sum_r = m_r + np.log(np.sum(np.exp(lw_r[np.isfinite(lw_r)] - m_r)))
+                        phys_temp[cn], phys_temp[ce] = rows_c[sel, cn], rows_c[sel, ce]
+                        Xp_temp[cn], Xp_temp[ce] = u_c[sel]
+                        log_pi1_y_vec[i], log_pi1_x_vec[i] = cu_c[sel], cx
+                        stage1_override[i] = log_sum_c - log_sum_r
+                    else:
+                        stage1_override[i] = -np.inf
+                Xp[i] = Xp_temp
+                phys_new[i] = phys_temp
+                continue
+
             # Choose block
-            if r_gibbs > p_gibbs:
-                block = layout.blocks[rng.randint(0, len(layout.blocks))]
-            else:
-                block = layout.fractions_block(0 if n_units == 1 else rng.randint(0, n_units))
+            block = layout.blocks[rng.randint(0, len(layout.blocks))]
             unit = layout.units[block.unit]
             Nc = unit.Nc
 
@@ -704,8 +638,13 @@ def run_demc(
             # MATLAB:
             # a = R(i,draw(1:D,i));
             # b = R(i,draw(D+1:2*D,i));
-            a_idx = R_mat[i][draw[:D, i]]
-            b_idx = R_mat[i][draw[D:2 * D, i]]
+            if in_prod:
+                partners = groups[group_of[i]][groups[group_of[i]] != i]
+                pick = partners[rng.permutation(len(partners))[:2 * D]]
+                a_idx, b_idx = pick[:D], pick[D:2 * D]
+            else:
+                a_idx = R_mat[i][draw[:D, i]]
+                b_idx = R_mat[i][draw[D:2 * D, i]]
 
             gamma_x = scaling_factor_x * 2.38 / np.sqrt(2 * D * (Nc - 1))
             gamma_nc = scaling_factor_nc * 2.38 / np.sqrt(2 * D * Nc)
@@ -724,6 +663,7 @@ def run_demc(
                 g_nc[~mask] = 1.0
 
             g_eta = gamma_eta if rng.random_sample() < 0.9 else 1.0
+
 
             # ── Snooker-jump pre-computation ───────────────────────────────
             # Active only for the fractions block, after burn-in and after a
@@ -749,7 +689,10 @@ def run_demc(
 
                 if T_filt >= 3 and N_chains >= 4:
                     # Three distinct chains different from i
-                    other_chains = np.delete(np.arange(N_chains), i)
+                    if in_prod:
+                        other_chains = groups[group_of[i]][groups[group_of[i]] != i]
+                    else:
+                        other_chains = np.delete(np.arange(N_chains), i)
                     r1, r2, r3 = other_chains[rng.permutation(len(other_chains))[:3]]
 
                     # Three independent archive rows
@@ -814,69 +757,10 @@ def run_demc(
                         + noise_eta * _mt_randn(rng)
                         )
 
+
             # ── Boundary handling ──────────────────────────────────────────
             unit.fold_fractions(Xp_temp, phys_temp)
-
-            # ── Gibbs-like update for discrete parameters ──────────────────
-            last_comp_sum_ok = unit.fractions_sum_ok(phys_temp) and r_gibbs <= p_gibbs
-
-            if last_comp_sum_ok:
-                # Gibbs step: candidate construction
-                n_comp_update = min(Nc, Nc if t > t_burnin else 1)
-                max_comb = 10 * n_comp_update + (N_chains - 1) if t > t_burnin else np.inf
-                components = rng.permutation(Nc)[:n_comp_update]
-
-                mol_all, nC_all, eta_all = _build_gibbs_candidates(
-                    i=i,
-                    t=t,
-                    t_burnin=t_burnin,
-                    Nc=Nc,
-                    N_chains=N_chains,
-                    components=np.asarray(components, dtype=int),
-                    classes=unit.classes,
-                    n_ranges_list=unit.n_ranges,
-                    mol_temp=phys_temp[unit.frac_cols],
-                    nC_temp=phys_temp[unit.nc_cols],
-                    eta_temp=phys_temp[unit.eta_cols],
-                    nC_vals=phys[:, unit.nc_cols],
-                    eta_vals=phys[:, unit.eta_cols],
-                    max_comb=max_comb,
-                    rng=rng,
-                )
-
-                # Embed the unit-level candidates into full state rows
-                phys_cand = np.tile(phys_temp, (mol_all.shape[0], 1))
-                phys_cand[:, unit.frac_cols] = mol_all
-                phys_cand[:, unit.nc_cols] = nC_all
-                phys_cand[:, unit.eta_cols] = eta_all
-
-                log_p_all = posterior_cheap_fn(*layout.posterior_args(phys_cand))
-                max_lp = np.max(log_p_all)
-                if not np.isfinite(max_lp):
-                    # All candidates have -inf posterior (e.g. all flash points ≤ 0 °F);
-                    # fall back to uniform weights so the chain can still move.
-                    w = np.ones(len(log_p_all)) / len(log_p_all)
-                else:
-                    w = np.exp(log_p_all - max_lp)
-                    w /= np.sum(w)
-
-                idx_sel = int(rng.choice(len(w), p=w))
-                log_pi1_y_vec[i] = log_p_all[idx_sel]
-
-                for cc in range(n_comp_update):
-                    j_comp = int(components[cc])
-                    nC_sel = int(nC_all[idx_sel, j_comp])
-                    eta_sel = eta_all[idx_sel, j_comp]
-                    phys_temp[unit.nc_cols[j_comp]] = nC_sel
-                    phys_temp[unit.eta_cols[j_comp]] = eta_sel
-                    # Update normalized X for nC and eta
-                    unit.encode_discrete(Xp_temp, j_comp, nC_sel, eta_sel)
-
-                log_pi1_x_vec[i] = posterior_cheap_fn(
-                    *layout.posterior_args(phys[i:i+1])
-                )[0]
-
-            elif block.kind in ("nC", "eta"):
+            if block.kind in ("nC", "eta"):
                 # Continuous-to-discrete mapping with triangle-fold
                 unit.decode_discrete(Xp_temp, phys_temp)
 
@@ -885,6 +769,8 @@ def run_demc(
 
         # ── Delayed-acceptance ─────────────────────────────────────────────
         log_alpha1 = beta_arr * (log_pi1_y_vec - log_pi1_x_vec) + J
+        exact_rows = ~np.isnan(stage1_override)
+        log_alpha1[exact_rows] = stage1_override[exact_rows]
         u1 = np.log(rng.random_sample(N_chains))
         pass1 = u1 < log_alpha1
 
@@ -925,18 +811,50 @@ def run_demc(
                     # phys_chain) always matches p_x.
                     phys[[k, k + 1]] = phys[[k + 1, k]]
 
+        # ── Parallel tempering swaps after the burn-in ─────────────────────
+        if in_prod and (t % swap_every_sampling) == 0:
+            start = (t // swap_every_sampling) % 2
+            for lev in range(start, n_hot, 2):
+                i_s = int(rng.choice(cold_idx)) if lev == 0 else n_cold + lev - 1
+                j_s = n_cold + lev
+                Delta = (beta_arr[i_s] - beta_arr[j_s]) * (p_X[j_s] - p_X[i_s])
+                swap_try[lev] += 1
+                if Delta >= 0 or np.log(rng.random_sample()) < Delta:
+                    X[[i_s, j_s]] = X[[j_s, i_s]]
+                    p_X[[i_s, j_s]] = p_X[[j_s, i_s]]
+                    phys[[i_s, j_s]] = phys[[j_s, i_s]]
+                    swap_acc[lev] += 1
+
         # ── Outlier detection during burn-in ──────────────────────────────
-        if t in (int(0.25 * t_burnin), int(0.5 * t_burnin),
-                 int(0.75 * t_burnin), t_burnin):
-            outliers = _detect_outliers(p_x[:t], t, outlier_method)
-            best = int(np.argmax(p_X))
-            for j_out in outliers:
-                X[j_out] = X[best].copy()
-                p_X[j_out] = p_X[best]
-                phys[j_out] = phys[best].copy()
-            if outliers and fid is not None:
-                fid.write(f"Chains {outliers} detected as outliers at t={t}. "
-                          f"Reset to chain {best}.\n")
+        if not burnin_done and t > t_burnin and (t - t_burnin) % every == 0:
+            omega = p_x[t - every:t].mean(axis=0)
+            thr = omega.max() - margin_best
+            outliers = [j for j in range(N_chains) if omega[j] < thr]
+            good = np.array([j for j in range(N_chains) if omega[j] >= thr])
+            if outliers:
+                # Reset to good chains drawn at random
+                donors = good[rng.randint(0, len(good), len(outliers))]
+                for j_out, j_don in zip(outliers, donors):
+                    X[j_out] = X[j_don].copy()
+                    p_X[j_out] = p_X[j_don]
+                    phys[j_out] = phys[j_don].copy()
+                n_resets += len(outliers)
+                if fid is not None:
+                    fid.write(f"Chains {outliers} below the others (mean log-post < {thr:.1f}) "
+                              f"at t={t}. Reset to random good chains {donors.tolist()} "
+                              f"(good: {good.tolist()}).\n")
+            elif t >= 2 * t_burnin:
+                burnin_done = True
+                t_burn = t
+                if fid is not None:
+                    fid.write(f"No outlier chains at t={t}: burn-in ends here.\n")
+            elif fid is not None:
+                fid.write(f"No outlier chains at t={t}; burn-in continues to at least {2 * t_burnin}.\n")
+            if not burnin_done and t >= burnin_cap * max_iterations:
+                burnin_done = True
+                t_burn = t
+                if fid is not None:
+                    fid.write(f"WARNING: burn-in cap reached at t={t} with outlier chains still present.\n")
 
         # ── Store current state ────────────────────────────────────────────
         phys_chain[t] = phys.T
@@ -946,34 +864,42 @@ def run_demc(
             x_archive[t] = X.T
 
         # ── R-hat convergence check ────────────────────────────────────────
-        if t > t_check and t % 2 == 0:
-            # Use physical parameter chains for R-hat
-            rhat = _r_hat(phys_chain, t_burnin, t)
-
-            # Parameters with structurally constant eta (e.g. n-paraffins):
-            # force NaN in storage (gap in plot) and 1.0 in the convergence
-            # test (trivially converged — no mixing needed for a fixed param).
-            rhat[_rhat_skip] = np.nan
-            R_hat[counter_check] = rhat
-
-            # For convergence test: NaN/inf from other discrete params → large
-            # sentinel; constant-eta params (already NaN) → 1.0.
-            rhat_test = np.where(_rhat_skip, 1.0, rhat)
-            rhat_test = np.where(np.isfinite(rhat_test), rhat_test, 1e18)
-            if np.all(rhat_test <= R_hat_threshold):
-                t_convergence = t
-                convergence = True
-                if fid is not None:
-                    fid.write(
-                        f"R-hat below {R_hat_threshold} for all parameters: "
-                        f"convergence after {t_convergence} iterations.\n"
-                    )
-                break
-
+        # Parameters with structurally constant eta (e.g. n-paraffins): NaN in
+        # storage (gap in plot), trivially converged in the test.
+        if burnin_done and t > t_burn and (t - t_burn) % 2 == 0:
+            rc = _r_hat_classic(phys_chain[:, :, :n_cold], t_burn, t)
+            rc[_rhat_skip] = np.nan
+            R_hat[counter_check] = rc
             counter_check += 1
 
         if t % 100 == 0:
-            print(f"\r  DE-MC iteration {t}/{max_iterations}  AR={AR[t].mean():.1f}%", end="", flush=True)
+            diag = ""
+            if burnin_done and t - t_burn >= 20:
+                rc = _r_hat_classic(phys_chain[:, :, :n_cold], t_burn, t)
+                rc[_rhat_skip] = np.nan
+                rc_t = np.where(np.isnan(rc), 1.0, rc)
+                rc_hist[t] = np.where(np.isfinite(rc_t), rc_t, 1e18).max()
+                diag = f"  R-hat max={np.nanmax(rc):.3f}"
+                ts = [t - j * rhat_spacing for j in range(rhat_checks)]
+                stop = (t - t_burn >= rhat_min_samples
+                        and all(tt in rc_hist and rc_hist[tt] <= rhat_stop for tt in ts))
+                if stop:
+                    win = phys_chain[t_burn:t + 1, :, :n_cold]
+                    ess_now = min(_ess_bulk(win[:, c, :]) for c in _ess_cols)
+                    diag += f"  ESS min={ess_now:.0f}"
+                    stop = ess_now >= ess_min
+                    if info is not None:
+                        info["ESS_min_at_stop"] = ess_now
+                if stop:
+                    t_convergence = t
+                    convergence = True
+                    if fid is not None:
+                        fid.write(f"R-hat <= {rhat_stop} at t = {ts[::-1]} and effective sample size "
+                                  f">= {ess_min}: convergence after {t_convergence} iterations.\n")
+                    print(f"\r  DE-MC iteration {t}/{max_iterations}  AR={AR[t].mean():.1f}%{diag}"
+                          f"  -> converged", flush=True)
+                    break
+            print(f"\r  DE-MC iteration {t}/{max_iterations}  AR={AR[t].mean():.1f}%{diag}", end="", flush=True)
 
     print()  # newline after progress
 
@@ -986,20 +912,27 @@ def run_demc(
 
     # ── Trim arrays to t_convergence ─────────────────────────────────────
     tc = t_convergence
-    x_chain = phys_chain[:tc]
+    keep = np.arange(n_cold)
+    x_chain = phys_chain[:tc][:, :, keep]
 
-    p_x = p_x[:tc]
-    AR = AR[:tc]
-    R_hat = R_hat[:counter_check + 1]   # +1: include the row that triggered convergence
+    p_x = p_x[:tc][:, keep]
+    AR = AR[:tc][:, keep]
+    R_hat = R_hat[:counter_check]
 
     # ── Post-burnin samples ───────────────────────────────────────────────
-    N_post = tc - t_burnin
+    if not burnin_done:
+        t_burn = tc - 1
     chain_reshaped = np.vstack(
-        [x_chain[t_burnin:tc, :, ch] for ch in range(N_chains)]
+        [x_chain[t_burn:tc, :, ch] for ch in range(len(keep))]
     )
     posterior_reshaped = np.concatenate(
-        [p_x[t_burnin:tc, ch] for ch in range(N_chains)]
+        [p_x[t_burn:tc, ch] for ch in range(len(keep))]
     )
+    if info is not None:
+        info["t_burnin"] = t_burn
+        info["n_resets"] = n_resets
+        info["swap_rates"] = swap_acc / np.maximum(swap_try, 1)
+        info["betas"] = beta_prod
 
     return (
         x_chain,

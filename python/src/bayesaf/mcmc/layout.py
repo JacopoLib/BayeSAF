@@ -49,7 +49,7 @@ posterior-argument convention.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable, Sequence
 
 import numpy as np
@@ -69,6 +69,10 @@ def _decode_nc(u: float, n_range: list[int]) -> int:
     return n_range[idx]
 
 
+# id(sp_list) -> (sp_list, eta_sorted, {nC: (eta_match, eta_norm_match)})
+_ETA_DECODE_CACHE: dict[int, tuple[list, np.ndarray, dict]] = {}
+
+
 def _decode_eta(
     u: float,
     sp_list: list[Species],
@@ -81,8 +85,12 @@ def _decode_eta(
     converted to 0-based Python indexing:
         idx_eta = floor(1 + u*(N-1) + 0.5) - 1
     """
-    eta_all = np.array([sp.eta_B_star for sp in sp_list])
-    eta_sorted = np.sort(eta_all)
+    entry = _ETA_DECODE_CACHE.get(id(sp_list))
+    if entry is None or entry[0] is not sp_list:
+        eta_all = np.array([sp.eta_B_star for sp in sp_list])
+        entry = (sp_list, np.sort(eta_all), {})
+        _ETA_DECODE_CACHE[id(sp_list)] = entry
+    _, eta_sorted, by_nc = entry
     N = len(eta_sorted)
     # MATLAB-compatible rounding: floor(x + 0.5) = round-half-away-from-zero
     idx_eta = int(np.floor(1.0 + u * (N - 1) + 0.5)) - 1
@@ -90,11 +98,14 @@ def _decode_eta(
     eta_target = eta_sorted[idx_eta]
 
     # Restrict to species with matching nC
-    nC_arr = np.array([sp.nC for sp in sp_list], dtype=int)
-    eta_norm_arr = np.array([sp.eta_B_star_norm for sp in sp_list])
-    match = np.where(nC_arr == nC_val)[0]
-    eta_match = eta_all[match]
-    eta_norm_match = eta_norm_arr[match]
+    sub = by_nc.get(nC_val)
+    if sub is None:
+        eta_all = np.array([sp.eta_B_star for sp in sp_list])
+        nC_arr = np.array([sp.nC for sp in sp_list], dtype=int)
+        eta_norm_arr = np.array([sp.eta_B_star_norm for sp in sp_list])
+        match = np.where(nC_arr == nC_val)[0]
+        sub = by_nc[nC_val] = (eta_all[match], eta_norm_arr[match])
+    eta_match, eta_norm_match = sub
     return float(eta_norm_match[np.argmin(np.abs(eta_match - eta_target))])
 
 
@@ -122,10 +133,83 @@ class CompositionUnit:
     n_ranges: list[list[int]]
     lower_bound_x: np.ndarray
     upper_bound_x: np.ndarray
+    _cell_cache: dict = field(default_factory=dict, repr=False, compare=False)
 
     @property
     def Nc(self) -> int:
         return len(self.nc_cols)
+
+    # -- decoder cells: measure of {u : decode(u) = isomer} ---------------------
+
+    def eta_cells(self, k: int, nC: int) -> dict:
+        """Decoder cells of the isomers of component k with nC carbon atoms.
+
+        Returns {eta_B_star_norm: (cell measure, [(u_lo, u_hi), ...])},
+        replicating _decode_eta exactly (rank of u on the class-wide sorted
+        eta_B_star list, then the nearest isomer at nC).
+        """
+        key = (k, int(nC))
+        if key in self._cell_cache:
+            return self._cell_cache[key]
+        sp_list = self.classes[k]
+        eta_all = np.array([sp.eta_B_star for sp in sp_list])
+        eta_sorted = np.sort(eta_all)
+        N = len(eta_sorted)
+        nC_arr = np.array([sp.nC for sp in sp_list], dtype=int)
+        match = np.where(nC_arr == int(nC))[0]
+        eta_match = eta_all[match]
+        norm_match = [float(sp_list[m].eta_B_star_norm) for m in match]
+        cells = {v: [0.0, []] for v in norm_match}
+        if N == 1:
+            cells[norm_match[0]] = [1.0, [(0.0, 1.0)]]
+        else:
+            for r in range(N):
+                lo = max(0.0, (r - 0.5) / (N - 1))
+                hi = min(1.0, (r + 0.5) / (N - 1))
+                d = norm_match[int(np.argmin(np.abs(eta_match - eta_sorted[r])))]
+                cells[d][0] += hi - lo
+                cells[d][1].append((lo, hi))
+        out = {v: (m, iv) for v, (m, iv) in cells.items()}
+        self._cell_cache[key] = out
+        return out
+
+    def log_cell_rows(self, phys_rows: np.ndarray) -> np.ndarray:
+        """log measure of the decoder cell of each row's (nC, eta), summed over components."""
+        out = np.zeros(phys_rows.shape[0])
+        for r in range(phys_rows.shape[0]):
+            for k in range(self.Nc):
+                nC = int(phys_rows[r, self.nc_cols[k]])
+                m = self.eta_cells(k, nC).get(float(phys_rows[r, self.eta_cols[k]]))
+                out[r] += (np.log(m[0]) if m is not None and m[0] > 0 else -np.inf) \
+                    - np.log(len(self.n_ranges[k]))
+        return out
+
+    def candidates(self, k: int) -> np.ndarray:
+        """All reachable (nC, eta_B_star_norm) pairs of component k, as an (M, 2) array."""
+        key = ("cand", k)
+        if key not in self._cell_cache:
+            # isomers with an empty decoder cell are unreachable
+            self._cell_cache[key] = np.array(
+                sorted({(sp.nC, sp.eta_B_star_norm) for sp in self.classes[k]
+                        if sp.nC in self.n_ranges[k]
+                        and self.eta_cells(k, sp.nC)[float(sp.eta_B_star_norm)][0] > 0}), dtype=float)
+        return self._cell_cache[key]
+
+    def sample_u(self, k: int, nC: float, eta: float, rng: np.random.RandomState) -> tuple[float, float]:
+        """Normalised (u_nC, u_eta) drawn uniformly inside the cells of (nC, eta)."""
+        K = len(self.n_ranges[k])
+        j = self.n_ranges[k].index(int(nC))
+        u_nc = (j + rng.random_sample()) / K
+        m, iv = self.eta_cells(k, int(nC))[float(eta)]
+        widths = np.array([hi - lo for lo, hi in iv])
+        lo, hi = iv[int(rng.choice(len(iv), p=widths / widths.sum()))]
+        u_eta = lo + (hi - lo) * rng.random_sample()
+        return min(u_nc, np.nextafter(1.0, 0.0)), u_eta
+
+    def decode_component(self, k: int, u_nc: float, u_eta: float) -> tuple[float, float]:
+        """(nC, eta_B_star_norm) of component k from its normalised coordinates."""
+        nC = _decode_nc(u_nc, self.n_ranges[k])
+        return float(nC), _decode_eta(u_eta, self.classes[k], int(nC))
 
     def fold_fractions(self, Xp_row: np.ndarray, phys_row: np.ndarray) -> None:
         """Boundary handling for the molar fractions; updates both rows in place."""
@@ -233,6 +317,10 @@ class ParameterLayout:
         for unit in self.units:
             unit.decode(X, phys)
         return X, phys, posterior_fn(*self.posterior_args(phys))
+
+    def log_cell(self, phys_rows: np.ndarray) -> np.ndarray:
+        """Sum over units of the log decoder-cell measure of each row."""
+        return sum(unit.log_cell_rows(phys_rows) for unit in self.units)
 
     def fractions_block(self, unit: int) -> Block:
         return next(b for b in self.blocks if b.kind == "fractions" and b.unit == unit)
