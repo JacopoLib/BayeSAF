@@ -314,7 +314,9 @@ def init_pool(
 
     n = n_workers or mp.cpu_count()
     use_shm = (batch_size is not None and nc is not None and classes is not None)
-    rebuild = _pool is None or _pool_n_workers != n
+    rebuild = (_pool is None or _pool_n_workers != n
+               or (use_shm and (_shm_X is None or _shm_batch_cap < batch_size
+                                or _shm_idx_arr.shape[1] != nc)))
 
     if rebuild:
         if _pool is not None:
@@ -608,6 +610,28 @@ def _worker_chunk_shm(args):
         _WORKER_T_ARR[s]  = T
 
 
+def _shm_batch(X_all, index_n_eta_all, worker, extra):
+    """Run *worker* over all samples through shared memory, in slices of at
+    most the allocated capacity."""
+    N_samples = X_all.shape[0]
+    vf_out = np.empty((N_samples, _shm_vf_arr.shape[1]))
+    T_out = np.empty((N_samples, _shm_T_arr.shape[1]))
+    n_w = _pool_n_workers
+    for s0 in range(0, N_samples, _shm_batch_cap):
+        n = min(_shm_batch_cap, N_samples - s0)
+        # Zero-copy input: write proposals directly into shared memory.
+        np.copyto(_shm_X_arr[:n], X_all[s0:s0 + n])
+        _shm_idx_arr[:n] = index_n_eta_all[s0:s0 + n]   # handles int32→int64 cast
+        # Coarse tasks: one chunk per worker → n_workers round-trips instead of n.
+        chunk = max(1, (n + n_w - 1) // n_w)
+        tasks = [(i * chunk, min((i + 1) * chunk, n)) + tuple(extra)
+                 for i in range(n_w) if i * chunk < n]
+        _pool.map(worker, tasks)
+        vf_out[s0:s0 + n] = _shm_vf_arr[:n]
+        T_out[s0:s0 + n] = _shm_T_arr[:n]
+    return vf_out, T_out
+
+
 def distillation_curve_batch(
     X_all: np.ndarray,
     classes: list[list[Species]],
@@ -635,21 +659,8 @@ def distillation_curve_batch(
     N_samples = X_all.shape[0]
 
     # ── Shared memory fast path ───────────────────────────────────────────────
-    if (_pool is not None and n_workers is None
-            and _shm_X is not None and N_samples <= _shm_batch_cap):
-        # Zero-copy input: write proposals directly into shared memory.
-        np.copyto(_shm_X_arr[:N_samples], X_all)
-        _shm_idx_arr[:N_samples] = index_n_eta_all   # handles int32→int64 cast
-        # Coarse tasks: one chunk per worker → n_workers round-trips instead of N_samples.
-        n_w = _pool_n_workers
-        chunk = max(1, (N_samples + n_w - 1) // n_w)
-        tasks = [
-            (i * chunk, min((i + 1) * chunk, N_samples), pressure)
-            for i in range(n_w) if i * chunk < N_samples
-        ]
-        _pool.map(_worker_chunk_shm, tasks)
-        # Zero-copy output: read results directly from shared memory.
-        return _shm_vf_arr[:N_samples].copy(), _shm_T_arr[:N_samples].copy()
+    if _pool is not None and n_workers is None and _shm_X is not None:
+        return _shm_batch(X_all, index_n_eta_all, _worker_chunk_shm, (pressure,))
 
     # ── Fallback paths ────────────────────────────────────────────────────────
     args = [(X_all[s], classes, index_n_eta_all[s], pressure) for s in range(N_samples)]
@@ -814,18 +825,8 @@ def distillation_curve_batch_cheap(
     N_samples = X_all.shape[0]
 
     # ── Shared memory fast path ───────────────────────────────────────────────
-    if (_pool is not None and n_workers is None
-            and _shm_X is not None and N_samples <= _shm_batch_cap):
-        np.copyto(_shm_X_arr[:N_samples], X_all)
-        _shm_idx_arr[:N_samples] = index_n_eta_all
-        n_w = _pool_n_workers
-        chunk = max(1, (N_samples + n_w - 1) // n_w)
-        tasks = [
-            (i * chunk, min((i + 1) * chunk, N_samples), pressure, vol1)
-            for i in range(n_w) if i * chunk < N_samples
-        ]
-        _pool.map(_worker_chunk_shm_cheap, tasks)
-        return _shm_vf_arr[:N_samples].copy(), _shm_T_arr[:N_samples].copy()
+    if _pool is not None and n_workers is None and _shm_X is not None:
+        return _shm_batch(X_all, index_n_eta_all, _worker_chunk_shm_cheap, (pressure, vol1))
 
     # ── Fallback paths ────────────────────────────────────────────────────────
     args = [(X_all[s], classes, index_n_eta_all[s], pressure, vol1) for s in range(N_samples)]
