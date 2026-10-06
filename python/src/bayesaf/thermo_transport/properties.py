@@ -173,6 +173,24 @@ def liquid_property(
         raise ValueError(f"Unknown thermophysical property: '{prop}'")
 
 
+def _liquid_property_cached(
+    prop: str,
+    T: np.ndarray,
+    sp: Species,
+    pressure: float = 101325.0,
+) -> np.ndarray:
+    """:func:`liquid_property` memoised per species, property, temperatures and
+    pressure (cache stored on the Species object)."""
+    cache = sp.__dict__.setdefault("_property_cache", {})
+    T = np.asarray(T, dtype=float)
+    key = (prop, T.tobytes(), T.shape, pressure)
+    val = cache.get(key)
+    if val is None:
+        val = liquid_property(prop, T, sp, pressure)
+        cache[key] = val
+    return val
+
+
 # ---------------------------------------------------------------------------
 # Mixture properties (vectorised over N_samples × N_exp)
 # ---------------------------------------------------------------------------
@@ -225,7 +243,7 @@ def mixture_property(
         for i in range(Nc):
             for j in range(N_samples):
                 sp = classes[i][index_n_eta_all[j, i]]
-                rho_mat[j, :, i] = liquid_property("rho", T, sp, pressure)
+                rho_mat[j, :, i] = _liquid_property_cached("rho", T, sp, pressure)
                 numerator[j, :, i] = X_full[j, i] * sp.mol_weight
         return numerator.sum(axis=2) / (numerator / rho_mat).sum(axis=2)
 
@@ -236,7 +254,7 @@ def mixture_property(
             for j in range(N_samples):
                 sp = classes[i][index_n_eta_all[j, i]]
                 mu_log[j, :, i] = X_full[j, i] * np.log(
-                    liquid_property("mu", T, sp, pressure)
+                    _liquid_property_cached("mu", T, sp, pressure)
                 )
         return np.exp(mu_log.sum(axis=2))
 
@@ -252,7 +270,7 @@ def mixture_property(
         for i in range(Nc):
             for j in range(N_samples):
                 sp = classes[i][index_n_eta_all[j, i]]
-                numerator[j, :, i] = X_full[j, i] * sp.mol_weight * liquid_property(prop, T, sp, pressure)
+                numerator[j, :, i] = X_full[j, i] * sp.mol_weight * _liquid_property_cached(prop, T, sp, pressure)
                 denominator[j, i] = X_full[j, i] * sp.mol_weight
         return numerator.sum(axis=2) / denominator.sum(axis=1, keepdims=True)
 
@@ -262,7 +280,7 @@ def mixture_property(
         for i in range(Nc):
             for j in range(N_samples):
                 sp = classes[i][index_n_eta_all[j, i]]
-                sigma_mat[j, :, i] = liquid_property("sigma", T, sp, pressure)
+                sigma_mat[j, :, i] = _liquid_property_cached("sigma", T, sp, pressure)
                 Xs[j, :, i] = X_full[j, i]
         return (sigma_mat * Xs).sum(axis=2)
 
