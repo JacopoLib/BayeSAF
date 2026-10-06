@@ -613,8 +613,9 @@ def plot_mcmc_diagnostics(
         colors_p = plt.cm.tab10(np.linspace(0, 1, R_hat.shape[1]))
         # NaN → plot as gaps; any residual sentinels clamped to nan as well
         R_hat_plot = np.where(np.isfinite(R_hat), R_hat, np.nan)
+        it_post = 2 * np.arange(1, R_hat_plot.shape[0] + 1)
         for p in range(R_hat_plot.shape[1]):
-            ax.plot(R_hat_plot[:, p], lw=0.75, color=colors_p[p],
+            ax.plot(it_post, R_hat_plot[:, p], lw=0.75, color=colors_p[p],
                     label=param_labels[p] if p < len(param_labels) else f"p{p}")
         ax.axhline(R_hat_threshold, color="red", ls="--", lw=1, label=f"R-hat = {R_hat_threshold}")
         finite_vals = R_hat_plot[np.isfinite(R_hat_plot)]
