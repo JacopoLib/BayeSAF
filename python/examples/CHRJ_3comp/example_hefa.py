@@ -56,8 +56,7 @@ from bayesaf.postprocessing.visualize import visualize_results
 # ---------------------------------------------------------------------------
 # Real fuel metadata
 # ---------------------------------------------------------------------------
-DATASET = ["rho", "nu", "distillation", "deltaT_dist",
-          "molWeight", "HC", "DCN", "LHV", "flash", "freezing"]
+DATASET = ["rho", "distillation", "molWeight", "HC", "DCN", "LHV", "flash"]
 DATA_DIR = "../../../exp/CHRJ_POSF6152"   # directory containing <name>.csv files
 FUEL_NAME = "CHRJ POSF-6152"
 T_BUBBLE = 445.00       # bubble temperature of the real fuel [K] (if known, otherwise set it to 1e+18)
@@ -88,31 +87,36 @@ ALPHA_DIRICHLET = np.ones(NUM_COMPONENTS)   # symmetric uniform Dirichlet
 # DE-MC parameters
 # ---------------------------------------------------------------------------
 
-MAX_ITERATIONS   = 5000
+MAX_ITERATIONS   = 20000
 T_BURNIN         = 500
-T_CHECK          = 2 * T_BURNIN
 SCALING_X        = 0.1
 SCALING_NC       = 1.0
 SCALING_ETA      = 1.0
 NOISE_X          = 1e-6
 NOISE_NC         = 1e-6
 NOISE_ETA        = 1e-6
-N_CHAINS         = 2 * (3 * NUM_COMPONENTS - 1)   # 28 chains
-OUTLIER_METHOD   = "mad"
-R_HAT_THRESHOLD  = 1.2
+N_CHAINS         = 2 * (3 * NUM_COMPONENTS - 1)   # 16 chains
 
 # Parallel tempering
-PT_SWITCH  = "True"
 BETA_MIN   = 1e-4
 T_LADDER   = "geometric"
 SWAP_FREQ  = 20
+N_COLD     = N_CHAINS // 2                    # chains at beta = 1 after the burn-in
 
 # Maximum number of chain pairs for proposal
 N_PAIRS  = 1
 
 # Proposal probabilities
-P_GIBBS    = 0.1
+P_GIBBS    = 0.3
 P_SNOOKER  = 0.1
+
+# Number of tries of the Gibbs move
+GIBBS_TRIES  = 32
+
+# Convergence criteria
+RHAT_STOP         = 1.1
+RHAT_MIN_SAMPLES  = 2000
+ESS_MIN           = 400
 
 # Post-processing
 BAND_PERCENTILES  = True
@@ -161,6 +165,7 @@ def main() -> None:
     # 4. Run DE-MC
     # ------------------------------------------------------------------
     print("Running DE-MC...")
+    info = {}
     (chain, posterior_pdf, chain_reshaped, posterior_reshaped,
      AR, R_hat, t_convergence) = run_demc(
         families=FAMILIES,
@@ -174,7 +179,6 @@ def main() -> None:
         upper_bound_eta=UPPER_ETA,
         max_iterations=MAX_ITERATIONS,
         t_burnin=T_BURNIN,
-        t_check=T_CHECK,
         scaling_factor_x=SCALING_X,
         scaling_factor_nc=SCALING_NC,
         scaling_factor_eta=SCALING_ETA,
@@ -182,9 +186,6 @@ def main() -> None:
         noise_nc=NOISE_NC,
         noise_eta=NOISE_ETA,
         N_chains=N_CHAINS,
-        outlier_method=OUTLIER_METHOD,
-        R_hat_threshold=R_HAT_THRESHOLD,
-        PT_switch=PT_SWITCH,
         beta_min=BETA_MIN,
         T_ladder=T_LADDER,
         swap_freq=SWAP_FREQ,
@@ -193,31 +194,23 @@ def main() -> None:
         p_snooker=P_SNOOKER,
         log_file="demc_log.txt",
         seed=42,
+        gibbs_tries=GIBBS_TRIES,
+        n_cold=N_COLD,
+        rhat_stop=RHAT_STOP,
+        rhat_min_samples=RHAT_MIN_SAMPLES,
+        ess_min=ESS_MIN,
+        info=info,
     )
 
     converged = t_convergence < MAX_ITERATIONS
-    print(f"\nDE-MC {'converged' if converged else 'did NOT converge'} at t = {t_convergence}.")
-    
+    print(f"\nDE-MC {'converged' if converged else 'did NOT converge'} at t = {t_convergence} "
+          f"(burn-in: {info['t_burnin']} iterations).")
     if R_hat.size > 0:
-
-        rhat_last = R_hat[-1]
-    
-        # remove NaN entries
-        rhat_valid = rhat_last[np.isfinite(rhat_last)]
-    
-        if rhat_valid.size == 0:
-            print("    → R-hat not available (all parameters constant).")
-    
-        elif np.all(rhat_valid <= R_HAT_THRESHOLD):
-            print(f"    → R-hat ≤ {R_HAT_THRESHOLD} for all non-constant parameters: convergence criterion satisfied.")
-    
-        else:
-            print(f"    → R-hat > {R_HAT_THRESHOLD}: chains not yet converged. Increase MAX_ITERATIONS.")
-    
-    else:
-    
-        print("  R-hat = not computed (chain shorter than t_check — increase MAX_ITERATIONS)")
-        print(f"  mean AR   = {AR[np.isfinite(AR)].mean():.3f} %")
+        print(f"    → R-hat max = {np.nanmax(R_hat[-1]):.3f}")
+    if "ESS_min_at_stop" in info:
+        print(f"    → minimum effective sample size = {info['ESS_min_at_stop']:.0f}")
+    if not converged:
+        print("    → stopping rule not satisfied: increase MAX_ITERATIONS.")
 
     # ------------------------------------------------------------------
     # 5. MAP estimate
@@ -248,7 +241,7 @@ def main() -> None:
     visualize_results(
         full_data, FAMILIES, classes,
         chain, AR, R_hat, chain_reshaped,
-        T_BURNIN, R_HAT_THRESHOLD, N_RANGES, NUM_COMPONENTS, variable_names,
+        info["t_burnin"], RHAT_STOP, N_RANGES, NUM_COMPONENTS, variable_names,
         pf,
         FUEL_NAME,
         confidence_width=CONFIDENCE_WIDTH,
