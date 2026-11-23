@@ -18,6 +18,7 @@ dependencies = [
     "scipy>=1.10",
     "pandas>=2.0",
     "matplotlib>=3.7",
+    "numba>=0.58",
 ]
 
 [project.optional-dependencies]

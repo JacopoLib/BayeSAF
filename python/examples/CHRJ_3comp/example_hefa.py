@@ -116,7 +116,7 @@ GIBBS_TRIES  = 32
 # Convergence criteria
 RHAT_STOP         = 1.1
 RHAT_MIN_SAMPLES  = 2000
-ESS_MIN           = 400
+ESS_MIN           = 400   # diagnostic only: warning if the bulk ESS of the molar fractions is lower
 
 # Post-processing
 BAND_PERCENTILES  = True
@@ -209,6 +209,8 @@ def main() -> None:
         print(f"    → R-hat max = {np.nanmax(R_hat[-1]):.3f}")
     if "ESS_min_at_stop" in info:
         print(f"    → minimum effective sample size = {info['ESS_min_at_stop']:.0f}")
+        if info["ESS_min_at_stop"] < ESS_MIN:
+            print(f"    → warning: minimum effective sample size below {ESS_MIN}.")
     if not converged:
         print("    → stopping rule not satisfied: increase MAX_ITERATIONS.")
 

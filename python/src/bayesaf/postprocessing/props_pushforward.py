@@ -103,11 +103,10 @@ from bayesaf.distillation.distillation_curve import (
 )
 
 # Families whose H count formula is 2n+2
-_PARAFFIN_FAMILIES = {"nparaffins", "isoparaffins", "isoparaffins_mono_bis"}
+_PARAFFIN_FAMILIES = {"nparaffins", "isoparaffins"}
 _H_COUNT = {
     "nparaffins": lambda n: 2 * n + 2,
     "isoparaffins": lambda n: 2 * n + 2,
-    "isoparaffins_mono_bis": lambda n: 2 * n + 2,
     "cycloparaffins": lambda n: 2 * n,
     "dicycloparaffins": lambda n: 2 * n - 2,
     "alkylbenzenes": lambda n: 2 * n - 6,

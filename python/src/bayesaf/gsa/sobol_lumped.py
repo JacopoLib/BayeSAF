@@ -91,7 +91,6 @@ from bayesaf.distillation.distillation_curve import distillation_curve, distilla
 _H_FORMULA: dict[str, object] = {
     "nparaffins": lambda n: 2 * n + 2,
     "isoparaffins": lambda n: 2 * n + 2,
-    "isoparaffins_mono_bis": lambda n: 2 * n + 2,
     "cycloparaffins": lambda n: 2 * n,
     "dicycloparaffins": lambda n: 2 * n - 2,
     "alkylbenzenes": lambda n: 2 * n - 6,

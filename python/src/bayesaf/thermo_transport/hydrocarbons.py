@@ -77,7 +77,6 @@ _DB_ROOT = Path(__file__).parent.parent.parent.parent.parent / "database"
 _FAMILY_CSV: dict[str, str] = {
     "nparaffins": "nparaffins/nparaffins_MatlabData.csv",
     "isoparaffins": "isoparaffins/isoparaffins_MatlabData.csv",
-    "isoparaffins_mono_bis": "isoparaffins_mono_bis/isoparaffins_mono_bis_MatlabData.csv",
     "cycloparaffins": "cycloparaffins/cycloparaffins_MatlabData.csv",
     "dicycloparaffins": "dicycloparaffins/dicycloparaffins_MatlabData.csv",
     "alkylbenzenes": "alkylbenzenes/alkylbenzenes_MatlabData.csv",

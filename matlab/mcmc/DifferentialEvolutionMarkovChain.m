@@ -35,7 +35,8 @@
 % It supports parallel tempering, delayed acceptance, snooker jumps, blocked updates,
 % an exact multiple-try Gibbs move on carbon atoms and isomers with a uniform prior
 % over isomers, and an adaptive burn-in with outlier-chain resets. Convergence is
-% monitored via the classic Gelman-Rubin R-hat statistic and the effective sample size.
+% monitored via the classic Gelman-Rubin R-hat statistic. The effective sample size is
+% reported as a diagnostic.
 
 % Auxiliary parameters:
 % Nc: number of surrogate mixture components  [-]
@@ -80,7 +81,9 @@
 % 26) n_cold              : number of chains at beta = 1 after the burn-in
 % 27) rhat_stop           : R-hat convergence threshold
 % 28) rhat_min_samples    : minimum number of iterations after the burn-in
-% 29) ess_min             : minimum effective sample size of the molar fractions
+% 29) ess_min             : bulk effective sample size of the molar fractions below which a
+%                           warning is written in the log (diagnostic only; it does not
+%                           take part in the stopping rule)
 
 % Outputs:
 % 1) x            : (t_convergence x 3*Nc-1 x n_cold) array containing the
@@ -102,8 +105,8 @@
 % is reached at ( = maxIterations in case convergence is not reached)
 % 8) info         : structure array with the burn-in length (t_burnin), the number of
 % outlier-chain resets (n_resets), the swap acceptance rates after the burn-in (swap_rates),
-% the inverse temperatures after the burn-in (betas), and the minimum effective sample
-% size of the molar fractions at the stop (ESS_min)
+% the inverse temperatures after the burn-in (betas), the bulk effective sample size of each
+% molar fraction computed on the returned samples (ESS) and its minimum (ESS_min)
 
 % --- References ---
 
@@ -318,7 +321,6 @@ end
 convergence = false; % switch
 t_convergence = maxIterations;
 counter_check = 0;
-ESS_stop = NaN;
 
 % Adaptive burn-in
 t_burn = t_burnin;
@@ -687,7 +689,7 @@ while ~convergence && t < maxIterations         % Dynamic part: evolution of N c
         R_hat(counter_check,rhat_skip) = NaN;
     end
 
-    %%% ------- Check convergence through the R-hat statistic and the effective sample size ------- %%%
+    %%% ------- Check convergence through the R-hat statistic ------- %%%
     if mod(t,100) == 0 && burnin_done && t - t_burn >= 20
 
         rc = rhat_classic(x(:,:,1:n_cold), t_burn, t);
@@ -698,21 +700,13 @@ while ~convergence && t < maxIterations         % Dynamic part: evolution of N c
         t_checks = t - (0:rhat_checks-1)*rhat_spacing;
         stop = t - t_burn >= rhat_min_samples && all(t_checks >= 1) && all(rhat_history(max(t_checks,1)) <= rhat_stop);
 
-        if stop
-            ESS_stop = Inf;
-            for j = cols_x
-                ESS_stop = min(ESS_stop, ess_bulk(squeeze(x(t_burn:t,j,1:n_cold))));
-            end
-            stop = ESS_stop >= ess_min;
-        end
-
         if ~show_waitbar
             fprintf('DE-MC iteration %d/%d  AR = %.1f%%  R-hat max = %.3f\n', t, maxIterations, mean(AR(t,:)), max(rc));
         end
 
         if stop
             t_convergence = t;
-            fprintf(fid, ['R-statistic below the critical threshold of ', num2str(rhat_stop), ' after ', num2str(fliplr(t_checks)), ' iterations and minimum effective sample size of the molar fractions equal to ', num2str(ESS_stop, '%.0f'), ': convergence reached after ', num2str(t_convergence), ' iterations within each chain. These samples will be used for posterior analysis after discarding the burn-in period.\n']);
+            fprintf(fid, ['R-statistic below the critical threshold of ', num2str(rhat_stop), ' after ', num2str(fliplr(t_checks)), ' iterations: convergence reached after ', num2str(t_convergence), ' iterations within each chain. These samples will be used for posterior analysis after discarding the burn-in period.\n']);
             convergence = true;
         end
 
@@ -742,6 +736,18 @@ p_x = p_x(1:t_convergence,1:n_cold);
 AR = AR(1:t_convergence,1:n_cold);
 R_hat = R_hat(1:counter_check,:);
 
+%%% ------- Effective sample size of the molar fractions (diagnostic, on the returned samples) ------- %%%
+ESS_vec = NaN(1, numel(cols_x));
+if burnin_done && t_convergence - t_burn >= 4
+    for j = 1:numel(cols_x)
+        ESS_vec(j) = ess_bulk(squeeze(x(t_burn+1:end, cols_x(j), :)));
+    end
+    fprintf(fid, ['Bulk effective sample size of the molar fractions (returned samples): minimum ', num2str(min(ESS_vec), '%.0f'), ', per parameter ', num2str(round(ESS_vec)), '.\n']);
+    if min(ESS_vec) < ess_min
+        fprintf(fid, ['WARNING: minimum effective sample size below ', num2str(ess_min), '.\n']);
+    end
+end
+
 %%% ------- Discard burn-in samples ------- %%%
 x_nb = zeros((t_convergence-t_burn)*n_cold, nParams);
 p_x_nb = zeros((t_convergence-t_burn)*n_cold, 1);
@@ -754,7 +760,8 @@ info.t_burnin = t_burn;
 info.n_resets = n_resets;
 info.swap_rates = swap_acc ./ max(swap_try, 1);
 info.betas = beta_sampling;
-info.ESS_min = ESS_stop;
+info.ESS = ESS_vec;
+info.ESS_min = min(ESS_vec);
 
 fclose(fid); % Close the file
 

@@ -67,7 +67,6 @@ from bayesaf.utilities.composition import mol_to_mass, mol_weight
 _NAMES_CSV: dict[str, str] = {
     "nparaffins": "nparaffins/nparaffins_Names.csv",
     "isoparaffins": "isoparaffins/isoparaffins_Names.csv",
-    "isoparaffins_mono_bis": "isoparaffins_mono_bis/isoparaffins_mono_bis_Names.csv",
     "cycloparaffins": "cycloparaffins/cycloparaffins_Names.csv",
     "dicycloparaffins": "dicycloparaffins/dicycloparaffins_Names.csv",
     "alkylbenzenes": "alkylbenzenes/alkylbenzenes_Names.csv",
@@ -80,7 +79,6 @@ _NAMES_CSV: dict[str, str] = {
 _H_FORMULA: dict[str, str] = {
     "nparaffins":          "2n+2",
     "isoparaffins":        "2n+2",
-    "isoparaffins_mono_bis": "2n+2",
     "cycloparaffins":      "2n",
     "dicycloparaffins":    "2n-2",
     "alkylbenzenes":       "2n-6",

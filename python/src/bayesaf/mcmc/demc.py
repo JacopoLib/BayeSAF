@@ -97,7 +97,9 @@ Inputs:
 32) rhat_checks         : number of consecutive R-hat checks below rhat_stop
 33) rhat_spacing        : iterations between two R-hat checks
 34) rhat_min_samples    : minimum number of post-burn-in iterations
-35) ess_min             : minimum effective sample size of the molar fractions
+35) ess_min             : bulk effective sample size of the molar fractions below
+                          which a warning is written (diagnostic only; it does not
+                          take part in the stopping rule)
 
 Outputs:
 1) x            : (t_convergence x 3*Nc-1 x N_chains) array of posterior
@@ -364,12 +366,14 @@ def run_demc(
         are reset to good chains drawn at random. The burn-in ends at the
         first check without resets after 2*t_burnin, or at
         burnin_cap*max_iterations.
-    rhat_stop, rhat_checks, rhat_spacing, rhat_min_samples, ess_min : the run
-        stops once the classic Gelman-Rubin R-hat is below rhat_stop at
+    rhat_stop, rhat_checks, rhat_spacing, rhat_min_samples : the run stops
+        once the classic Gelman-Rubin R-hat is below rhat_stop at
         rhat_checks checks rhat_spacing iterations apart, after at least
-        rhat_min_samples post-burn-in iterations, and the bulk effective
-        sample size (Vehtari et al., 2021) of every molar fraction is at
-        least ess_min.
+        rhat_min_samples post-burn-in iterations.
+    ess_min : diagnostic only. At the end of the run the bulk effective sample
+        size (Vehtari et al., 2021) of every molar fraction is computed on the
+        returned samples and stored in info; a warning is written in the log
+        if the minimum is below ess_min.
 
     Returns
     -------
@@ -884,24 +888,32 @@ def run_demc(
                 stop = (t - t_burn >= rhat_min_samples
                         and all(tt in rc_hist and rc_hist[tt] <= rhat_stop for tt in ts))
                 if stop:
-                    win = phys_chain[t_burn:t + 1, :, :n_cold]
-                    ess_now = min(_ess_bulk(win[:, c, :]) for c in _ess_cols)
-                    diag += f"  ESS min={ess_now:.0f}"
-                    stop = ess_now >= ess_min
-                    if info is not None:
-                        info["ESS_min_at_stop"] = ess_now
-                if stop:
                     t_convergence = t
                     convergence = True
                     if fid is not None:
-                        fid.write(f"R-hat <= {rhat_stop} at t = {ts[::-1]} and effective sample size "
-                                  f">= {ess_min}: convergence after {t_convergence} iterations.\n")
+                        fid.write(f"R-hat <= {rhat_stop} at t = {ts[::-1]}: "
+                                  f"convergence after {t_convergence} iterations.\n")
                     print(f"\r  DE-MC iteration {t}/{max_iterations}  AR={AR[t].mean():.1f}%{diag}"
                           f"  -> converged", flush=True)
                     break
             print(f"\r  DE-MC iteration {t}/{max_iterations}  AR={AR[t].mean():.1f}%{diag}", end="", flush=True)
 
     print()  # newline after progress
+
+    # ── Effective sample size (diagnostic, on the returned samples) ──────────
+    ess_vals = None
+    if burnin_done and t_convergence - t_burn >= 4:
+        win = phys_chain[t_burn:t_convergence, :, :n_cold]
+        ess_vals = np.array([_ess_bulk(win[:, c, :]) for c in _ess_cols])
+        if info is not None:
+            info["ESS"] = dict(zip(_ess_cols, ess_vals))
+            info["ESS_min_at_stop"] = float(ess_vals.min())
+        if fid is not None:
+            fid.write("Bulk effective sample size of the molar fractions "
+                      f"(returned samples): min {ess_vals.min():.0f}, "
+                      f"per parameter {np.round(ess_vals).astype(int).tolist()}.\n")
+            if ess_vals.min() < ess_min:
+                fid.write(f"WARNING: minimum effective sample size below {ess_min}.\n")
 
     if fid is not None:
         if not convergence:

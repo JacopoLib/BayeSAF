@@ -140,7 +140,7 @@ gibbs_tries = 32; % number of tries of the Gibbs move
 % +++ Convergence criteria +++ %
 rhat_stop = 1.1; % threshold value for the R-hat statistic
 rhat_min_samples = 2000; % minimum number of iterations after the burn-in
-ess_min = 400; % minimum effective sample size of the molar fractions
+ess_min = 400; % diagnostic only: warning if the bulk effective sample size of the molar fractions is lower
 
 [chain, posterior_pdf, chain_reshaped, posterior_pdf_reshaped, AR, R_hat, t_convergence, info] = DifferentialEvolutionMarkovChain(families, posterior, posterior_cheap, classes, LowerBound_molFrac, UpperBound_molFrac, n_ranges, LowerBound_eta_B_star, UpperBound_eta_B_star, maxIterations, t_burnin, scaling_factor_X, scaling_factor_nc, scaling_factor_eta, noise_X, noise_nc, noise_eta, N_chains, beta_min, T_ladder, swap_freq, n_pairs, p_gibbs, p_snooker, gibbs_tries, n_cold, rhat_stop, rhat_min_samples, ess_min);
 
@@ -153,6 +153,9 @@ if ~isempty(R_hat)
     fprintf('    R-hat max = %.3f\n', max(R_hat(end,:)));
 end
 fprintf('    minimum effective sample size = %.0f\n', info.ESS_min);
+if info.ESS_min < ess_min
+    fprintf('    warning: minimum effective sample size below %d.\n', ess_min);
+end
 
 %% --- POST-PROCESSING --- %%
 
