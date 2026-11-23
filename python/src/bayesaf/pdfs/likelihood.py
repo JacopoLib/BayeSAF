@@ -188,6 +188,40 @@ def _h_to_carbon_ratio(
     return np.round(n_hydrogen / n_carbon, 3)
 
 
+def _full_distillation_curves(
+    X_all: np.ndarray,
+    classes: list[list[Species]],
+    index_n_eta: np.ndarray,
+    pressure: float,
+    cache: dict,
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Full distillation curves of a batch, computed once per cache.
+
+    The cache is shared by the properties that need the curves (``distillation`` and
+    ``deltaT_dist``) within one evaluation of the likelihood. The curves are reused only if the
+    pressure, the molar fractions and the species indices are exactly those of the stored ones.
+    """
+    hit = cache.get("full_curves")
+    if (
+        hit is not None
+        and hit["pressure"] == pressure
+        and np.array_equal(hit["X_all"], X_all)
+        and np.array_equal(hit["index_n_eta"], index_n_eta)
+    ):
+        return hit["vol_all"], hit["T_all"]
+
+    vol_all, T_all = distillation_curve_batch(X_all, classes, index_n_eta, pressure)
+    cache["full_curves"] = {
+        "pressure": pressure,
+        "X_all": np.array(X_all, copy=True),
+        "index_n_eta": np.array(index_n_eta, copy=True),
+        "vol_all": vol_all,
+        "T_all": T_all,
+    }
+    return vol_all, T_all
+
+
 # ---------------------------------------------------------------------------
 # Main likelihood
 # ---------------------------------------------------------------------------
@@ -224,7 +258,9 @@ def log_likelihood(
         Property name.
     pressure : float
     _cache : dict, optional
-        Mutable dict used to cache distillation curves between calls.
+        Mutable dict shared by the properties of one evaluation of the likelihood, so that the
+        distillation curves are computed once for ``distillation`` and ``deltaT_dist``. Pass a
+        new dict for every batch of samples (``build_pdfs`` does it).
 
     Returns
     -------
@@ -325,12 +361,7 @@ def log_likelihood(
         return _gaussian_log_likelihood(phi, data[:, 0], std_data)
 
     elif variable == "distillation":
-        vol_all, T_all = distillation_curve_batch(X_all, classes, index_n_eta, pressure)
-        _cache["vol_all"] = vol_all
-        _cache["T_all"] = T_all
-        _cache["pressure"] = pressure
-        _cache["index_n_eta"] = index_n_eta
-        _cache["X_all"] = X_all
+        vol_all, T_all = _full_distillation_curves(X_all, classes, index_n_eta, pressure, _cache)
 
         T_target = data[:, 0]
         T_interp = np.array([
@@ -343,11 +374,7 @@ def log_likelihood(
         return L
 
     elif variable == "deltaT_dist":
-        if "vol_all" in _cache and _cache.get("pressure") == pressure:
-            vol_all = _cache["vol_all"]
-            T_all = _cache["T_all"]
-        else:
-            vol_all, T_all = distillation_curve_batch(X_all, classes, index_n_eta, pressure)
+        vol_all, T_all = _full_distillation_curves(X_all, classes, index_n_eta, pressure, _cache)
 
         T10 = np.array([_interp_extrap(10.0,  vol_all[s], T_all[s]) for s in range(N_samples)]).ravel()
         T50 = np.array([_interp_extrap(50.0,  vol_all[s], T_all[s]) for s in range(N_samples)]).ravel()
@@ -410,10 +437,6 @@ def log_likelihood_cheap(
 
         vol1 = float(data[0, 0])
         vol_all, T_all = distillation_curve_batch_cheap(X_all, classes, index_n_eta, pressure, vol1)
-
-        _cache["vol_all"] = vol_all
-        _cache["T_all"] = T_all
-        _cache["pressure"] = pressure
 
         std_data = std_data.ravel()
         T_interp = np.array([

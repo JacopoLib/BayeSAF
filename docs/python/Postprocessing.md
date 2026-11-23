@@ -112,4 +112,4 @@ to zero are left unchanged). `sobol_indices`, `sobol_distillation` take a `seed`
 | `PropertyCheck_MAP/` | one figure per property: MAP and credible band against the measurements |
 | `GSA/` | `Si_<property>`, `Si_lumped` |
 
-The R-hat figure shows the threshold `RHAT_STOP` and the burn-in end.
+The `AcceptanceRate` figure marks the burn-in end and has its y axis limited to 0-100 %: the initial state counts as an accepted sample, so the very first iterations can exceed 100 %. The `Rhat` figure shows the threshold `RHAT_STOP`; its y axis starts at 0.9 and goes up to the largest R-hat (at most 5).

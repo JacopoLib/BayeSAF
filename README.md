@@ -74,7 +74,7 @@ Each run writes, in the folder of the example:
 |---|---|
 | `MAP.txt` | maximum-a-posteriori surrogate: species, molar/mass/volume fractions, blend properties (H/C, DCN, flash point, freezing point, LHV, pseudo-critical properties) |
 | `MCMC.txt` (MATLAB), `demc_log.txt` (Python) | log of the sampler: burn-in, outlier-chain resets, convergence and effective sample size |
-| `Figures/` | chains, posterior marginals and joint distributions, property checks against the data, sensitivity indices |
+| `Figures/` | chains, acceptance rate and R-hat, posterior marginals and joint distributions, property checks against the data, sensitivity indices |
 | `CHRJ_3comp.mat` (MATLAB) | workspace of the run |
 
 The sampler stops when the R-hat statistic is below the threshold at consecutive checks. The bulk effective sample size of the molar fractions is computed at the end of every run and reported as a diagnostic, with a warning if it is below `ess_min`. A run that reaches `maxIterations` without meeting the R-hat criterion has not converged: increase the number of iterations.
@@ -94,7 +94,7 @@ The `docs/` folder describes both implementations in detail, starting from [`doc
 
 * how to use the code: [Python quick start](docs/python/Quick-start.md) and [MATLAB quick start](docs/matlab/Quick-start.md), [input data](docs/Input-data.md), the configuration reference of [Python](docs/python/Configuration-reference.md) and of [MATLAB](docs/matlab/Configuration-reference.md);
 * what the code does: [parametrisation](docs/Notation-and-parametrisation.md), [Bayesian model](docs/Bayesian-model.md), [thermophysical models](docs/Thermophysical-models.md) and [sampler](docs/Sampler.md);
-* [differences between the Python and MATLAB implementations](docs/Differences-Python-MATLAB.md) and the known limitations of each.
+* [differences between the Python and MATLAB implementations](docs/Differences-Python-MATLAB.md).
 
 # Objectives
 

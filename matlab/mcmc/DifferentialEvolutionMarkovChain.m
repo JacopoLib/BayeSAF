@@ -84,6 +84,17 @@
 % 29) ess_min             : bulk effective sample size of the molar fractions below which a
 %                           warning is written in the log (diagnostic only; it does not
 %                           take part in the stopping rule)
+%
+% Optional name-value arguments (after ess_min); the defaults are the values used so far:
+% 'Seed'              : seed of the random number generator (default 1234); each parallel
+%                       worker, if a pool exists, receives Seed + spmdIndex
+% 'BetaMinSampling'   : minimum inverse temperature of the hot chains after the burn-in (default 0.05)
+% 'SwapEverySampling' : iterations between two swaps after the burn-in (default 1)
+% 'OutlierEvery'      : iterations between two outlier-chain checks (default [] = max(50, floor(t_burnin/4)))
+% 'BurninCap'         : maximum burn-in length, as a fraction of maxIterations (default 0.75)
+% 'RhatChecks'        : number of consecutive R-hat checks below rhat_stop (default 3)
+% 'RhatSpacing'       : iterations between two R-hat checks, a multiple of 100 (default 500)
+% 'LogFile'           : name of the log file (default 'MCMC.txt')
 
 % Outputs:
 % 1) x            : (t_convergence x 3*Nc-1 x n_cold) array containing the
@@ -139,13 +150,30 @@
 % Bayesian Anal. 16, 667-718.
 % ------------------------------------------------------------------------
 
-function [x, p_x, x_nb, p_x_nb, AR, R_hat, t_convergence, info] = DifferentialEvolutionMarkovChain(families, Posterior_PDF, Posterior_PDF_cheap, classes, LowerBound_x, UpperBound_x, n_ranges, LowerBound_eta_B_star, UpperBound_eta_B_star, maxIterations, t_burnin, scaling_factor_X, scaling_factor_nc, scaling_factor_eta, noise_X, noise_nc, noise_eta, N_chains, beta_min, T_ladder, swap_freq, n_pairs, p_gibbs, p_snooker, gibbs_tries, n_cold, rhat_stop, rhat_min_samples, ess_min)
+function [x, p_x, x_nb, p_x_nb, AR, R_hat, t_convergence, info] = DifferentialEvolutionMarkovChain(families, Posterior_PDF, Posterior_PDF_cheap, classes, LowerBound_x, UpperBound_x, n_ranges, LowerBound_eta_B_star, UpperBound_eta_B_star, maxIterations, t_burnin, scaling_factor_X, scaling_factor_nc, scaling_factor_eta, noise_X, noise_nc, noise_eta, N_chains, beta_min, T_ladder, swap_freq, n_pairs, p_gibbs, p_snooker, gibbs_tries, n_cold, rhat_stop, rhat_min_samples, ess_min, varargin)
+
+% === Optional name-value arguments ===
+% The defaults reproduce the settings that used to be fixed in the code.
+parser = inputParser;
+parser.FunctionName = 'DifferentialEvolutionMarkovChain';
+is_count = @(v, vmin) isnumeric(v) && isscalar(v) && isfinite(v) && v >= vmin && v == floor(v);
+addParameter(parser, 'Seed', 1234, @(v) is_count(v, 0));
+addParameter(parser, 'BetaMinSampling', 0.05, @(v) isnumeric(v) && isscalar(v) && v > 0 && v <= 1);
+addParameter(parser, 'SwapEverySampling', 1, @(v) is_count(v, 1));
+addParameter(parser, 'OutlierEvery', [], @(v) isempty(v) || is_count(v, 1));
+addParameter(parser, 'BurninCap', 0.75, @(v) isnumeric(v) && isscalar(v) && v > 0 && v <= 1);
+addParameter(parser, 'RhatChecks', 3, @(v) is_count(v, 1));
+% R-hat is stored only at multiples of 100 iterations, so the spacing of the checks must be one as well
+addParameter(parser, 'RhatSpacing', 500, @(v) is_count(v, 100) && mod(v, 100) == 0);
+addParameter(parser, 'LogFile', 'MCMC.txt', @(v) ischar(v) || (isstring(v) && isscalar(v)));
+parse(parser, varargin{:});
+opts = parser.Results;
 
 % === Deterministic Seeding Pattern (Official Implementation) ===
 % Ensures reproducibility across runs and parallel workers.
 
-% Choose a fixed base seed for this DE-MC experiment
-baseSeed = 1234;
+% Base seed for this DE-MC experiment
+baseSeed = opts.Seed;
 
 % Set the global RNG state deterministically
 rng(baseSeed, 'twister');
@@ -162,18 +190,25 @@ end
 % ================================================================
 
 % Parallel tempering after the burn-in
-beta_min_sampling = 0.05; % minimum inverse temperature of the hot chains
-swap_every_sampling = 1; % swap frequency
+beta_min_sampling = opts.BetaMinSampling; % minimum inverse temperature of the hot chains
+swap_every_sampling = opts.SwapEverySampling; % swap frequency
 
 % Burn-in
-outlier_every = max(50, floor(t_burnin/4)); % iterations between two outlier-chain checks
-burnin_cap = 0.75; % maximum burn-in length, as a fraction of maxIterations
+if isempty(opts.OutlierEvery)
+    outlier_every = max(50, floor(t_burnin/4)); % iterations between two outlier-chain checks
+else
+    outlier_every = opts.OutlierEvery;
+end
+burnin_cap = opts.BurninCap; % maximum burn-in length, as a fraction of maxIterations
 
 % Convergence
-rhat_checks = 3; % number of consecutive R-hat checks below rhat_stop
-rhat_spacing = 500; % iterations between two R-hat checks
+rhat_checks = opts.RhatChecks; % number of consecutive R-hat checks below rhat_stop
+rhat_spacing = opts.RhatSpacing; % iterations between two R-hat checks
 
-fid = fopen('MCMC.txt', 'w'); % Open the file for writing
+fid = fopen(opts.LogFile, 'w'); % Open the file for writing
+if fid < 0
+    error('DifferentialEvolutionMarkovChain:logFile', 'Cannot open the log file: %s', opts.LogFile);
+end
 
 % Write the ASCII art header
 fprintf(fid, '    ____                  _____ ___    ______                               \n');

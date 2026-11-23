@@ -78,9 +78,14 @@
 % 20) band_percentiles     : string denoting whether the band representing the 90% confidence interval is colored with
 % percentiles ('True') or not ('False')
 % 21) confidence_width     : width of the confidence interval
+% 22) rhat_stop (optional)  : R-hat threshold drawn in the R-hat figure (default 1.1)
 % ------------------------------------------------------------------------
 
-function [temperature_range, property_MAP, volumeFraction_MAP, percentiles_list, mean_model, percentiles_model, model_output_samples, volFrac_interp, sobol_idx] = props_pushforward(fullData, families, classes, chain, AR, R_hat, chain_reshaped, t_convergence, t_burnin, n_ranges, numComponents, variable_names, x_MAP, nc_MAP, eta_B_star_MAP, minT_array, maxT_array, pressure_distillation, fuel_name, band_percentiles, confidence_width)
+function [temperature_range, property_MAP, volumeFraction_MAP, percentiles_list, mean_model, percentiles_model, model_output_samples, volFrac_interp, sobol_idx] = props_pushforward(fullData, families, classes, chain, AR, R_hat, chain_reshaped, t_convergence, t_burnin, n_ranges, numComponents, variable_names, x_MAP, nc_MAP, eta_B_star_MAP, minT_array, maxT_array, pressure_distillation, fuel_name, band_percentiles, confidence_width, rhat_stop)
+
+if nargin < 22 || isempty(rhat_stop)
+    rhat_stop = 1.1; % default R-hat threshold shown in the R-hat figure
+end
 
 rng('default'); % to ensure reproducibility
 
@@ -524,6 +529,69 @@ for m = 2*numComponents:3*numComponents-1
     set(gcf, 'Position', [100, 100, pix, pix/1.3801]);
     filenameTrace_ncm = strcat(folderPathMCMC, 'Trace_eta', num2str(m-2*numComponents+1));
     print(filenameTrace_ncm, '-dpng', '-r600');
+end
+
+
+% ---------- Acceptance rate of the chains at beta = 1 ---------- %
+t = tiledlayout(1,1); t.Padding = 'none'; t.TileSpacing = 'none'; nexttile
+figure('visible', 'off');
+hold on;
+box on;
+colors = parula(size(AR, 2));
+for i = 1:size(AR, 2)
+    plot(AR(:,i), 'LineWidth', 0.75, 'Color', colors(i, :));
+end
+xline(t_burnin, '--', 'Color', red, 'LineWidth', 1); % end of the burn-in
+ylim([0 100]); % the initial state counts as an accepted sample: the first iterations can exceed 100 %
+xlabelHandle = xlabel('MCMC Iterations');
+ylabelHandle = ylabel('Acceptance rate [\%]');
+set(xlabelHandle, 'FontSize', fontsize, 'FontName', fontname, 'Interpreter', 'latex');
+set(ylabelHandle, 'FontSize', fontsize, 'FontName', fontname, 'Interpreter', 'latex');
+set(0,'defaultfigurecolor',[1 1 1]);
+axesHandle = gca;
+set(axesHandle, 'FontSize', fontsize, 'FontName', fontname, 'Linewidth', line);
+set(gcf, 'Position', [100, 100, pix, pix/1.3801]);
+filenameAR = strcat(folderPathMCMC, 'AcceptanceRate');
+print(filenameAR, '-dpng', '-r600');
+
+% ---------- R-hat statistic of the parameters (every 2 iterations after the burn-in) ---------- %
+if ~isempty(R_hat)
+    R_hat_plot = R_hat;
+    R_hat_plot(~isfinite(R_hat_plot)) = NaN; % constant parameters (NaN in R_hat) are shown as gaps
+    t = tiledlayout(1,1); t.Padding = 'none'; t.TileSpacing = 'none'; nexttile
+    figure('visible', 'off');
+    hold on;
+    box on;
+    colors = turbo(size(R_hat_plot, 2)); % one distinct colour per parameter
+    iterations_post_burnin = 2*(1:size(R_hat_plot, 1));
+    line_handles = gobjects(1, size(R_hat_plot, 2));
+    for j = 1:size(R_hat_plot, 2)
+        line_handles(j) = plot(iterations_post_burnin, R_hat_plot(:,j), 'LineWidth', 0.75, 'Color', colors(j, :));
+    end
+    yline(rhat_stop, '--', 'Color', red, 'LineWidth', 1); % R-hat threshold of the stopping rule
+    finite_values = R_hat_plot(isfinite(R_hat_plot));
+    if ~isempty(finite_values)
+        ylim([0.9, min(max(1.15*max(finite_values), 1.1*rhat_stop), 5)]); % the threshold is always inside the axis
+    end
+    parameter_labels = cell(1, size(R_hat_plot, 2));
+    for j = 1:numComponents-1
+        parameter_labels{j} = strcat('$X_{', num2str(j), '}$');
+    end
+    for j = 1:numComponents
+        parameter_labels{numComponents-1+j} = strcat('$n_{C,', num2str(j), '}$');
+        parameter_labels{2*numComponents-1+j} = strcat('$\eta_{B,', num2str(j), '}^{*}$');
+    end
+    legend(line_handles, parameter_labels, 'Interpreter', 'latex', 'FontSize', fontsize-6, 'FontName', fontname, 'NumColumns', 2, 'Location', 'northeast');
+    xlabelHandle = xlabel('MCMC Iterations (post-burn-in)');
+    ylabelHandle = ylabel('$\hat{R}$');
+    set(xlabelHandle, 'FontSize', fontsize, 'FontName', fontname, 'Interpreter', 'latex');
+    set(ylabelHandle, 'FontSize', fontsize, 'FontName', fontname, 'Interpreter', 'latex');
+    set(0,'defaultfigurecolor',[1 1 1]);
+    axesHandle = gca;
+    set(axesHandle, 'FontSize', fontsize, 'FontName', fontname, 'Linewidth', line);
+    set(gcf, 'Position', [100, 100, pix, pix/1.3801]);
+    filenameRhat = strcat(folderPathMCMC, 'Rhat');
+    print(filenameRhat, '-dpng', '-r600');
 end
 
 

@@ -153,20 +153,22 @@ def build_pdfs(
         var = variable_names[i]
 
         def _lik(
-            X_all, N_all, Eta_all,
-            _data=data, _std=std, _var=var,
+            X_all, N_all, Eta_all, _cache=None,
+            *, _data=data, _std=std, _var=var,
         ) -> np.ndarray:
             return log_likelihood(
                 families, classes, _data, _std,
                 X_all, N_all, Eta_all, _var, pressure_distillation,
+                _cache=_cache,
             )
 
         lik_handles.append(_lik)
 
     def likelihood_fn(X_all: np.ndarray, N_all: np.ndarray, Eta_all: np.ndarray) -> np.ndarray:
         total = np.zeros(X_all.shape[0])
+        cache: dict = {}   # shared by the properties of this evaluation (e.g. the distillation curves)
         for h in lik_handles:
-            total += h(X_all, N_all, Eta_all)
+            total += h(X_all, N_all, Eta_all, cache)
         return total
 
     def posterior_fn(X_all: np.ndarray, N_all: np.ndarray, Eta_all: np.ndarray) -> np.ndarray:
@@ -221,20 +223,22 @@ def build_pdfs_cheap(
         var = variable_names[i]
 
         def _lik(
-            X_all, N_all, Eta_all,
-            _data=data, _std=std, _var=var,
+            X_all, N_all, Eta_all, _cache=None,
+            *, _data=data, _std=std, _var=var,
         ) -> np.ndarray:
             return log_likelihood_cheap(
                 families, classes, _data, _std,
                 X_all, N_all, Eta_all, _var, pressure_distillation,
+                _cache=_cache,
             )
 
         lik_handles.append(_lik)
 
     def likelihood_fn(X_all, N_all, Eta_all):
         total = np.zeros(X_all.shape[0])
+        cache: dict = {}   # shared by the properties of this evaluation
         for h in lik_handles:
-            total += h(X_all, N_all, Eta_all)
+            total += h(X_all, N_all, Eta_all, cache)
         return total
 
     def posterior_fn(X_all, N_all, Eta_all):

@@ -51,8 +51,10 @@ the pseudo-critical temperature and pressure (bar) from the Lee-Kesler mixing ru
 [temperature_range, property_MAP, volumeFraction_MAP, percentiles_list, mean_model, percentiles_model, ...
  model_output_samples, volFrac_interp, sobol_idx] = props_pushforward(fullData, families, classes, chain, AR, R_hat, ...
     chain_reshaped, t_convergence, info.t_burnin, n_ranges, numComponents, variable_names, x_MAP, nc_MAP, eta_B_star_MAP, ...
-    minT_array, maxT_array, pressure_distillation, fuel_name, band_percentiles, confidence_width);
+    minT_array, maxT_array, pressure_distillation, fuel_name, band_percentiles, confidence_width, rhat_stop);
 ```
+
+The last argument, `rhat_stop`, is optional.
 
 In MATLAB a single function does the pushforward, the sensitivity analysis **and all the plots** (the equivalent of `props_pushforward` plus `visualize_results` in Python).
 
@@ -69,13 +71,14 @@ Written with `print(..., '-dpng', '-r600')` in `./Figures/` (relative to the cur
 
 | Folder | Files |
 |---|---|
-| `MCMC_check/` | `Trace_X<k>`, `Trace_nc<k>`, `Trace_eta<k>` |
+| `MCMC_check/` | `Trace_X<k>`, `Trace_nc<k>`, `Trace_eta<k>`, `AcceptanceRate`, `Rhat` |
 | `PosteriorPDF/MarginalProbability/` | `Marginal_X<k>`, `Marginal_nc<k>`, `Marginal_eta<k>` |
 | `PosteriorPDF/Joint2D/` | `Joint2D_X<m>_X<p>`, `Joint2D_nc<m>_nc<p>`, `Joint2D_eta<m>_eta<p>`, `Joint2D_X<m>_nc<p>`, `Joint2D_X<m>_eta<p>`, `Joint2D_eta<m>_nc<p>` |
 | `PropertyCheck_MAP/` | one figure per property (`rho`, `distillation`, `molWeight`, ...), plus `T5010` and `T9010` if `deltaT_dist` is used |
 | `GSA/` | `Si_<property>` for each non-lumped property, `Si_lumped` |
 
-The MATLAB version does **not** plot the acceptance rate and the R-hat trace; `AR` and `R_hat` are returned for you to plot them. The Python version does.
+`AcceptanceRate` shows the cumulative acceptance rate of each chain, with the end of the burn-in marked. The y axis is limited to 0-100 %: the initial state counts as an accepted sample, so the very first iterations can exceed 100 %. `Rhat` shows the R-hat of each parameter every 2 iterations after the burn-in,
+with the stopping threshold (`rhat_stop`, the optional 22nd argument of `props_pushforward`, default 1.1) as a dashed line; constant parameters (NaN) appear as gaps. The y axis starts at 0.9 and goes up to the largest R-hat (at most 5).
 The figures use the utilities `daviolinplot.m` and `slanCM.m` included in `matlab/utilities/`.
 
 ### Sensitivity analysis
@@ -94,3 +97,5 @@ Procedure: the distinct samples (rounded to 6 decimals) are split at random into
 divided by their sum, so that they add up to 1. For `mu` and `nu` the output is scaled by `1e6`, for `specificHeat` by `1e-3`.
 
 Each function draws its random permutation from a local `RandStream('twister', 'Seed', 0)`, so the global random number generator is left untouched and the indices are reproducible.
+
+`props_pushforward` itself begins with `rng('default')` (so that the figures are reproducible): after calling it, the global random number generator is in the default state.

@@ -112,9 +112,10 @@ Details:
 - **Distillation.** The full curve is computed for each sample ([Thermophysical models](Thermophysical-models.md#distillation-curve)),
   then linearly interpolated at the measured recovered volumes with linear extrapolation outside the
   curve. Any non-finite interpolated value gives `-inf`.
-- **`deltaT_dist`.** Computes its own distillation curves in the Python implementation: the cache that would
-  share them with the `distillation` handle is created anew at every call and is never reused. The MATLAB implementation
-  does share them when the batch is the same (see the box below).
+- **`deltaT_dist`.** Shares the distillation curves with `distillation`: `build_pdfs` creates an empty cache dictionary at
+  every evaluation of the likelihood and passes it to all the properties; the first one that needs the curves computes them and the other reuses them
+  (provided that pressure, molar fractions and species indices are exactly the same). The order in `DATASET` does not matter, and a new batch never sees the curves of a previous one.
+  The MATLAB implementation does the same with a different mechanism (see the box below).
 - **Temperature-dependent properties.** Evaluated at the measured temperatures with `mixture_property`.
 
 ## Cheap likelihood and cheap posterior

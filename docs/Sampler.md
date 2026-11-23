@@ -218,28 +218,18 @@ See [Post-processing and outputs](python/Postprocessing.md#return-values-of-run_
 
 ## MATLAB implementation: notes
 
-- **Signature.** `DifferentialEvolutionMarkovChain` takes 29 positional arguments ([Configuration reference](matlab/Configuration-reference.md)) and returns
+- **Signature.** `DifferentialEvolutionMarkovChain` takes 29 positional arguments and optional name-value pairs ([Configuration reference](matlab/Configuration-reference.md)) and returns
   `[x, p_x, x_nb, p_x_nb, AR, R_hat, t_convergence, info]`.
-- **Settings fixed in the code.** The following are not arguments, and are changed by editing the file:
-
-  | Variable | Value | Meaning |
-  |---|---|---|
-  | `baseSeed` | 1234 | seed of the global generator (`rng(baseSeed, 'twister')`) |
-  | `beta_min_sampling` | 0.05 | lowest inverse temperature of the production ladder |
-  | `swap_every_sampling` | 1 | iterations between swaps in production |
-  | `outlier_every` | `max(50, floor(t_burnin/4))` | iterations between outlier checks |
-  | `burnin_cap` | 0.75 | burn-in forced to end at this fraction of `maxIterations` |
-  | `rhat_checks` | 3 | consecutive R-hat checks |
-  | `rhat_spacing` | 500 | iterations between checks |
-
-  If you change `rhat_spacing`, keep it a multiple of 100, because R-hat is stored only when `mod(t,100) == 0` (the MATLAB code does not check it).
-- **Random numbers.** `rng(1234, 'twister')` at the start. If a parallel pool already exists, each worker receives the seed
-  `1234 + spmdIndex` (this uses `spmdIndex`, introduced in MATLAB R2022b). The seed cannot be changed from outside.
+- **Optional settings.** `Seed`, `BetaMinSampling`, `SwapEverySampling`, `OutlierEvery`, `BurninCap`, `RhatChecks`, `RhatSpacing` and `LogFile` are optional
+  name-value arguments after `ess_min`, with the defaults listed in the [Configuration reference](matlab/Configuration-reference.md#optional-name-value-arguments-of-differentialevolutionmarkovchain).
+  If you give `RhatSpacing`, it must be a multiple of 100, because R-hat is stored only when `mod(t,100) == 0` (the call stops with an error otherwise).
+- **Random numbers.** `rng(Seed, 'twister')` at the start (`Seed` is 1234 by default). If a parallel pool already exists, each worker receives the seed
+  `Seed + spmdIndex` (this uses `spmdIndex`, introduced in MATLAB R2022b).
 - **Gibbs move.** Always the multiple-try version with `gibbs_tries` tries, a required argument. There is no "enumerate all candidates" option.
 - **Jump sizes.** The 90/10 choice between `gamma` and 1 uses `randsample` (Statistics and Machine Learning Toolbox).
   `scaling_factor_nc` must be a scalar.
 - **Iteration counter.** `t` starts at 1 (the initial state); the acceptance rate is `100 * accepted / (t-1)`.
-- **Log and waitbar.** The log is always written to `MCMC.txt` in the current folder. If MATLAB runs with the desktop,
+- **Log and waitbar.** The log is written to `MCMC.txt` in the current folder, or to the file given with `'LogFile'`. If MATLAB runs with the desktop,
   a waitbar with a *Cancel* button is shown; cancelling stops the loop and the run returns what has been computed, flagged as not converged. Without the desktop,
   a line is printed in the Command Window every 100 iterations (with the maximum R-hat once the burn-in has ended).
 - **Effective sample size.** As in Python, it is computed at the end of the run on the returned samples and stored in `info.ESS` and `info.ESS_min`;

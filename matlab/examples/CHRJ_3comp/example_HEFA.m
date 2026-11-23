@@ -142,6 +142,10 @@ rhat_stop = 1.1; % threshold value for the R-hat statistic
 rhat_min_samples = 2000; % minimum number of iterations after the burn-in
 ess_min = 400; % diagnostic only: warning if the bulk effective sample size of the molar fractions is lower
 
+% Optional name-value arguments of DifferentialEvolutionMarkovChain (the defaults are shown):
+% 'Seed', 1234, 'BetaMinSampling', 0.05, 'SwapEverySampling', 1, 'OutlierEvery', [], 'BurninCap', 0.75,
+% 'RhatChecks', 3, 'RhatSpacing', 500, 'LogFile', 'MCMC.txt'
+
 [chain, posterior_pdf, chain_reshaped, posterior_pdf_reshaped, AR, R_hat, t_convergence, info] = DifferentialEvolutionMarkovChain(families, posterior, posterior_cheap, classes, LowerBound_molFrac, UpperBound_molFrac, n_ranges, LowerBound_eta_B_star, UpperBound_eta_B_star, maxIterations, t_burnin, scaling_factor_X, scaling_factor_nc, scaling_factor_eta, noise_X, noise_nc, noise_eta, N_chains, beta_min, T_ladder, swap_freq, n_pairs, p_gibbs, p_snooker, gibbs_tries, n_cold, rhat_stop, rhat_min_samples, ess_min);
 
 if t_convergence < maxIterations
@@ -168,7 +172,7 @@ species_MAP = MAPwriter(families, numComponents, x_MAP, nc_MAP, eta_B_star_MAP, 
 % Visualize Bayesian inference analysis outcomes
 band_percentiles = 'True'; % 90% confidence interval colored with percentiles ('True') or not ('False')
 confidence_width = 0.95; % 'confidence_width'% confidence interval
-[temperature_range, property_MAP, volumeFraction_MAP, percentiles_list, mean_model, percentiles_model, model_output_samples, volFrac_interp, sobol_idx] = props_pushforward(fullData, families, classes, chain, AR, R_hat, chain_reshaped, t_convergence, info.t_burnin, n_ranges, numComponents, variable_names, x_MAP, nc_MAP, eta_B_star_MAP, minT_array, maxT_array, pressure_distillation, fuel_name, band_percentiles, confidence_width);
+[temperature_range, property_MAP, volumeFraction_MAP, percentiles_list, mean_model, percentiles_model, model_output_samples, volFrac_interp, sobol_idx] = props_pushforward(fullData, families, classes, chain, AR, R_hat, chain_reshaped, t_convergence, info.t_burnin, n_ranges, numComponents, variable_names, x_MAP, nc_MAP, eta_B_star_MAP, minT_array, maxT_array, pressure_distillation, fuel_name, band_percentiles, confidence_width, rhat_stop);
 
 %% --- SAVE VARIABLES FROM WORKSPACE --- %%
 

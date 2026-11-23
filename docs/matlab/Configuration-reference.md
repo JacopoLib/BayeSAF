@@ -22,9 +22,9 @@ Every setting of `example_HEFA.m` and every argument of `DifferentialEvolutionMa
 | `alpha` | Dirichlet concentration | `ones(1, numComponents)` |
 | `classes` | `classes{i} = Hydrocarbons(families{i}, n_ranges{i})` | |
 
-## Arguments of `DifferentialEvolutionMarkovChain`
+## Positional arguments of `DifferentialEvolutionMarkovChain`
 
-The arguments are **positional**; the order is the one in the table.
+The 29 arguments are **positional**; the order is the one in the table.
 
 | # | Argument | Meaning | Example |
 |---|---|---|---|
@@ -56,21 +56,30 @@ The arguments are **positional**; the order is the one in the table.
 | 28 | `rhat_min_samples` | minimum iterations after the burn-in | 2000 |
 | 29 | `ess_min` | **diagnostic only**: warning if the minimum bulk ESS of the molar fractions is below it | 400 |
 
-## Settings fixed inside the sampler
+## Optional name-value arguments of `DifferentialEvolutionMarkovChain`
 
-These are variables at the beginning of `DifferentialEvolutionMarkovChain.m`, not arguments:
+After the 29 positional arguments, these settings can be given as name-value pairs. The defaults are the values that used to be fixed in the code, so a call without them behaves as before.
 
-| Variable | Value |
-|---|---|
-| `baseSeed` | 1234 |
-| `beta_min_sampling` | 0.05 |
-| `swap_every_sampling` | 1 |
-| `outlier_every` | `max(50, floor(t_burnin/4))` |
-| `burnin_cap` | 0.75 |
-| `rhat_checks` | 3 |
-| `rhat_spacing` | 500 |
+| Name | Meaning | Default | Python argument |
+|---|---|---|---|
+| `'Seed'` | seed of the random number generator (non-negative integer); each parallel worker, if a pool exists, receives `Seed + spmdIndex` | 1234 | `seed` |
+| `'BetaMinSampling'` | lowest inverse temperature of the production ladder, in (0, 1] | 0.05 | `beta_min_sampling` |
+| `'SwapEverySampling'` | iterations between swaps in production (integer >= 1) | 1 | `swap_every_sampling` |
+| `'OutlierEvery'` | iterations between outlier checks (integer >= 1); `[]` means `max(50, floor(t_burnin/4))` | `[]` | `outlier_every` |
+| `'BurninCap'` | burn-in forced to end at this fraction of `maxIterations`, in (0, 1] | 0.75 | `burnin_cap` |
+| `'RhatChecks'` | consecutive R-hat checks below `rhat_stop` (integer >= 1) | 3 | `rhat_checks` |
+| `'RhatSpacing'` | iterations between R-hat checks; a multiple of 100, at least 100 | 500 | `rhat_spacing` |
+| `'LogFile'` | name of the log file | `'MCMC.txt'` | `log_file` |
 
-Edit the file to change them. Keep `rhat_spacing` a multiple of 100.
+Example:
+
+```matlab
+[chain, posterior_pdf, chain_reshaped, posterior_pdf_reshaped, AR, R_hat, t_convergence, info] = ...
+    DifferentialEvolutionMarkovChain(<the 29 arguments>, 'Seed', 42, 'LogFile', 'run42.txt');
+```
+
+An invalid value or an unknown name stops the call with an error (the arguments are validated with `inputParser`; names are case-insensitive and can be abbreviated if unambiguous).
+The `'RhatSpacing'` constraint exists because R-hat is stored only at multiples of 100 iterations.
 
 ## Post-processing
 
@@ -78,6 +87,7 @@ Edit the file to change them. Keep `rhat_spacing` a multiple of 100.
 |---|---|---|
 | `band_percentiles` | `'True'` colours the credible band with the percentiles, `'False'` does not | `'True'` |
 | `confidence_width` | width of the credible interval (0.95 gives the 2.5-97.5 % band) | 0.95 |
+| `rhat_stop` (22nd argument of `props_pushforward`, optional) | R-hat threshold drawn in the R-hat figure (default 1.1) | `rhat_stop` of the sampler |
 
 ## Choosing values
 

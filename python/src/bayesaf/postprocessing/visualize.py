@@ -596,6 +596,7 @@ def plot_mcmc_diagnostics(
     for i in range(N_chains):
         ax.plot(AR[:, i], lw=0.75, color=colors[i])
     ax.axvline(t_burnin, color="red", ls="--", lw=1, label=f"Burn-in ({t_burnin})")
+    ax.set_ylim(0, 100)   # the initial state counts as an accepted sample: the first iterations can exceed 100 %
     ax.set_xlabel("MCMC Iterations", fontsize=_FS, fontfamily=_FN)
     ax.set_ylabel("Acceptance Rate [%]", fontsize=_FS, fontfamily=_FN)
     ax.legend(fontsize=_FS - 2)
@@ -620,7 +621,8 @@ def plot_mcmc_diagnostics(
         ax.axhline(R_hat_threshold, color="red", ls="--", lw=1, label=f"R-hat = {R_hat_threshold}")
         finite_vals = R_hat_plot[np.isfinite(R_hat_plot)]
         if finite_vals.size > 0:
-            ax.set_ylim(0, min(finite_vals.max() * 1.15, 5.0))
+            # R-hat is close to 1 when the chains agree; the threshold is always inside the axis
+            ax.set_ylim(0.9, min(max(finite_vals.max() * 1.15, 1.1 * R_hat_threshold), 5.0))
         ax.set_xlabel("MCMC Iteration (post-burnin)", fontsize=_FS, fontfamily=_FN)
         ax.set_ylabel("R-hat", fontsize=_FS, fontfamily=_FN)
         ax.legend(fontsize=_FS - 3, ncol=2, loc="upper right")

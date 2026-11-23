@@ -49,7 +49,7 @@ database/<family>/ ──> Hydrocarbons ─────────────�
 
 | Function | Purpose |
 |---|---|
-| `[x, p_x, x_nb, p_x_nb, AR, R_hat, t_convergence, info] = DifferentialEvolutionMarkovChain(...)` | the sampler; 29 arguments in [Configuration reference](Configuration-reference.md) |
+| `[x, p_x, x_nb, p_x_nb, AR, R_hat, t_convergence, info] = DifferentialEvolutionMarkovChain(<29 arguments>, Name, Value, ...)` | the sampler; arguments and optional name-value pairs in [Configuration reference](Configuration-reference.md) |
 
 Local functions of the same file: `isomer_tables`, `isomer_prior`, `decode_component`, `decode_rows`, `fold_fractions`, `log_sum_exp`, `rhat_classic`, `ess_bulk`.
 
@@ -59,7 +59,7 @@ Local functions of the same file: `isomer_tables`, `isomer_prior`, `decode_compo
 |---|---|
 | `[x_MAP, nc_MAP, eta_B_star_MAP] = MAPfinder(posterior, chain, numComponents)` | highest-posterior sample |
 | `species_MAP = MAPwriter(families, numComponents, x_MAP, nc_MAP, eta_B_star_MAP, fuel_name)` | writes `MAP.txt` |
-| `[temperature_range, property_MAP, volumeFraction_MAP, percentiles_list, mean_model, percentiles_model, model_output_samples, volFrac_interp, sobol_idx] = props_pushforward(fullData, families, classes, chain, AR, R_hat, chain_reshaped, t_convergence, t_burnin, n_ranges, numComponents, variable_names, x_MAP, nc_MAP, eta_B_star_MAP, minT_array, maxT_array, pressure_distillation, fuel_name, band_percentiles, confidence_width)` | pushforward, sensitivity analysis and figures |
+| `[temperature_range, property_MAP, volumeFraction_MAP, percentiles_list, mean_model, percentiles_model, model_output_samples, volFrac_interp, sobol_idx] = props_pushforward(fullData, families, classes, chain, AR, R_hat, chain_reshaped, t_convergence, t_burnin, n_ranges, numComponents, variable_names, x_MAP, nc_MAP, eta_B_star_MAP, minT_array, maxT_array, pressure_distillation, fuel_name, band_percentiles, confidence_width, rhat_stop)` (the last argument is optional) | pushforward, sensitivity analysis and figures |
 
 ## `gsa/`
 

@@ -8,7 +8,7 @@ hydrocarbons.
 > Learning*, Fuel 419, 138835 (2026), https://doi.org/10.1016/j.fuel.2026.138835
 
 The repository contains two implementations of the same method, **MATLAB** (`matlab/`) and **Python** (`python/`), which share the database (`database/`) and the experimental data (`exp/`).
-This documentation describes both as they are coded, including the points where they differ and the pitfalls found while documenting them.
+This documentation describes both as they are coded, including the points where they differ.
 
 ## In one paragraph
 
@@ -26,7 +26,6 @@ The outputs are the maximum-a-posteriori (MAP) surrogate, the posterior samples,
 | Parameters | [Configuration reference](python/Configuration-reference.md) | [Configuration reference](matlab/Configuration-reference.md) |
 | Results | [Post-processing and outputs](python/Postprocessing.md) | [Post-processing and outputs](matlab/Postprocessing.md) |
 | Functions | [API reference](python/API-reference.md) | [API reference](matlab/API-reference.md) |
-| Pitfalls | [Known limitations](python/Known-limitations.md) | [Known limitations](matlab/Known-limitations.md) |
 | Contributing | [Development](python/Development.md) | |
 
 ## Common to both: data and methodology
