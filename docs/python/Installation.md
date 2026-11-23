@@ -11,8 +11,8 @@
 ## Install from the repository
 
 ```bash
-git clone git@<host-gitlab>:<group>/saf-uq/bayesaf.git
-cd bayesaf/python
+git clone https://github.com/JacopoLib/BayeSAF.git
+cd BayeSAF/python
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 ```
