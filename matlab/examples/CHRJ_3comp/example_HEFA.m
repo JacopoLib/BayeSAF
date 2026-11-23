@@ -45,7 +45,7 @@ addpath('../../../database/isoparaffins')
 addpath('../../../database/cycloparaffins')
 addpath('../../../database/dicycloparaffins')
 addpath('../../../database/alkylbenzenes')
-addpath('../../../database/alkylnaphtalenes')
+addpath('../../../database/alkylnaphthalenes')
 addpath('../../../database/cycloaromatics')
 
 addpath('../../../exp/CHRJ_POSF6152')

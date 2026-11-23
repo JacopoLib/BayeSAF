@@ -1,0 +1,18 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.venv/
+
+# Outputs written by the examples
+matlab/examples/*/Figures/
+matlab/examples/*/MAP.txt
+matlab/examples/*/MCMC.txt
+matlab/examples/*/*.mat
+python/examples/*/Figures/
+python/examples/*/MAP.txt
+python/examples/*/demc_log.txt

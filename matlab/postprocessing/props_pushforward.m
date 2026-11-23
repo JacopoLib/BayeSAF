@@ -739,7 +739,7 @@ for h = 1:numel(variable_names)
                 nHydrogen_MAP = nHydrogen_MAP + x_MAP(l)*(2*nc_MAP(l)-2);
             elseif strcmp(families(l), 'alkylbenzenes')
                 nHydrogen_MAP = nHydrogen_MAP + x_MAP(l)*(2*nc_MAP(l)-6);
-            elseif strcmp(families(l), 'alkylnaphtalenes')
+            elseif strcmp(families(l), 'alkylnaphthalenes')
                 nHydrogen_MAP = nHydrogen_MAP + x_MAP(l)*(2*nc_MAP(l)-12);
             elseif strcmp(families(l), 'cycloaromatics')
                 nHydrogen_MAP = nHydrogen_MAP + x_MAP(l)*(2*nc_MAP(l)-8);
@@ -773,7 +773,7 @@ for h = 1:numel(variable_names)
                         nHydrogen = nHydrogen + molFrac_j(l)*(2*nC_j(l)-2);
                     elseif strcmp(families(l), 'alkylbenzenes')
                         nHydrogen = nHydrogen + molFrac_j(l)*(2*nC_j(l)-6);
-                    elseif strcmp(families(l), 'alkylnaphtalenes')
+                    elseif strcmp(families(l), 'alkylnaphthalenes')
                         nHydrogen = nHydrogen + molFrac_j(l)*(2*nC_j(l)-12);
                     elseif strcmp(families(l), 'cycloaromatics')
                         nHydrogen = nHydrogen + molFrac_j(l)*(2*nC_j(l)-8);

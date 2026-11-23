@@ -70,8 +70,7 @@ _NAMES_CSV: dict[str, str] = {
     "cycloparaffins": "cycloparaffins/cycloparaffins_Names.csv",
     "dicycloparaffins": "dicycloparaffins/dicycloparaffins_Names.csv",
     "alkylbenzenes": "alkylbenzenes/alkylbenzenes_Names.csv",
-    "alkylnaphtalenes":  "alkylnaphtalenes/alkylnaphtalenes_Names.csv",
-    "alkylnaphthalenes": "alkylnaphtalenes/alkylnaphtalenes_Names.csv",
+    "alkylnaphthalenes": "alkylnaphthalenes/alkylnaphthalenes_Names.csv",
     "cycloaromatics": "cycloaromatics/cycloaromatics_Names.csv",
 }
 
@@ -82,7 +81,6 @@ _H_FORMULA: dict[str, str] = {
     "cycloparaffins":      "2n",
     "dicycloparaffins":    "2n-2",
     "alkylbenzenes":       "2n-6",
-    "alkylnaphtalenes":    "2n-12",
     "alkylnaphthalenes":   "2n-12",
     "cycloaromatics":      "2n-8",
 }

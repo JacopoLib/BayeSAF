@@ -95,10 +95,12 @@ switch variable
                     nHydrogen = nHydrogen + molFracMat(:,j) .* (2*n_all(:,j)-2);
                 case 'alkylbenzenes'
                     nHydrogen = nHydrogen + molFracMat(:,j) .* (2*n_all(:,j)-6);
-                case 'alkylnaphtalenes'
+                case 'alkylnaphthalenes'
                     nHydrogen = nHydrogen + molFracMat(:,j) .* (2*n_all(:,j)-12);
                 case 'cycloaromatics'
                     nHydrogen = nHydrogen + molFracMat(:,j) .* (2*n_all(:,j)-8);
+                otherwise
+                    error('Unknown hydrocarbon family for the H/C ratio: %s', families{j});
             end
         end
         phiModel = round(nHydrogen ./ nCarbon, 3);
@@ -167,12 +169,17 @@ switch variable
     case 'flash'
         WiMat    = zeros(numSamples, Nc);
         BI_flash = zeros(numSamples, Nc);
+        invalid_flash = false(numSamples, 1); % ASTM D-7215 is undefined for flash points <= 0 degF
         for j = 1:Nc
             for k = 1:numSamples
                 c = classes{j}(index_n_eta(k,j));
                 WiMat(k,j)    = c.molWeight;
                 flashF        = (c.Tf - 273.15) * 9/5 + 32;
-                BI_flash(k,j) = 51708 * exp((log(flashF) - 2.6287)^2 / (-0.91725));
+                if flashF > 0
+                    BI_flash(k,j) = 51708 * exp((log(flashF) - 2.6287)^2 / (-0.91725));
+                else
+                    invalid_flash(k) = true;
+                end
             end
         end
         Yi = zeros(numSamples, Nc);
@@ -180,7 +187,7 @@ switch variable
             Yi(jj,:) = mol2mass(molFracMat(jj,:), WiMat(jj,:));
         end
         BI_blend    = sum(Yi .* BI_flash, 2);
-        phiModel_F  = exp(((-0.91725) * log(BI_blend/51708)).^0.5 + 2.6287);
+        phiModel_F  = exp(((-0.91725) * log(max(BI_blend/51708, 1e-300))).^0.5 + 2.6287);
         phiModel    = (phiModel_F - 32) * 5/9 + 273.15;
 
         stdData  = reshape(stdData, 1, []);
@@ -188,6 +195,7 @@ switch variable
         std_mat  = repmat(stdData,    numSamples, 1);
         arrayLikelihood = log(2*pi*std_mat.^2) + ((phiModel - data_mat).^2) ./ (std_mat.^2);
         L = -0.5 * sum(arrayLikelihood, 2);
+        L(invalid_flash) = -Inf;
 
     case 'freezing'
         WiMat       = zeros(numSamples, Nc);
@@ -255,7 +263,7 @@ switch variable
         L(any(~isfinite(T_interpolated), 2)) = -Inf;
 
     case 'deltaT_dist'
-        if isempty(cache) || ~isequal(cache.pressure, pressure)
+        if isempty(cache) || ~isequal(cache.pressure, pressure) || ~isequal(cache.X_all, X_all) || ~isequal(cache.index_n_eta, index_n_eta)
             [volFrac_all, T_dist_all] = DistillationCurve_speed(X_all, classes, index_n_eta, pressure);
         else
             volFrac_all = cache.volFrac_all;

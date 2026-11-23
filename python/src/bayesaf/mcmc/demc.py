@@ -118,6 +118,7 @@ Outputs:
 
 from __future__ import annotations
 
+import functools
 import sys
 from typing import Callable, Sequence
 
@@ -301,7 +302,7 @@ def _uniform_isomer_prior(layout, posterior_fn, posterior_cheap_fn):
 # Main DE-MC function
 # ---------------------------------------------------------------------------
 
-def run_demc(
+def _run_demc(
     families: list[str],
     posterior_fn: PostFn,
     posterior_cheap_fn: PostFn,
@@ -342,7 +343,7 @@ def run_demc(
     rhat_spacing: int = 500,
     rhat_min_samples: int = 2000,
     ess_min: float = 400,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
     """
     Run the DE-MC algorithm with delayed acceptance and parallel tempering.
 
@@ -393,6 +394,13 @@ def run_demc(
     t_convergence : int
         Iteration at which convergence was declared.
     """
+    # The stopping test looks up the R-hat history at t, t - rhat_spacing, ...; the history is
+    # recorded only at multiples of 100, so any other spacing would never allow a stop.
+    if rhat_spacing < 100 or rhat_spacing % 100 != 0:
+        raise ValueError(f"rhat_spacing must be a positive multiple of 100 (got {rhat_spacing})")
+    if rhat_checks < 1:
+        raise ValueError(f"rhat_checks must be at least 1 (got {rhat_checks})")
+
     rng = np.random.RandomState(seed)  # MT19937 — matches MATLAB rng(seed,'twister')
     if layout is None:
         layout = SurrogateLayout(classes, n_ranges, lower_bound_x, upper_bound_x)
@@ -955,3 +963,12 @@ def run_demc(
         R_hat,
         t_convergence,
     )
+
+
+@functools.wraps(_run_demc)
+def run_demc(*args, **kwargs):
+    # The worker pool and its shared memory are released even if the run raises an exception.
+    try:
+        return _run_demc(*args, **kwargs)
+    finally:
+        shutdown_pool()

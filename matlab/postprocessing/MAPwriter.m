@@ -116,19 +116,19 @@ for l = 1:numComponents
 
         species_MAP(l) = alkylbenzenes_names.Name(nc_idx(1,l) + row_MAP_idx(l) - 1);
         Wi_MAP(l) = alkylbenzenes.W(nc_idx(1,l) + row_MAP_idx(l) - 1);
-    elseif strcmp(families(l), 'alkylnaphtalenes')
-        data = 'alkylnaphtalenes/alkylnaphtalenes_MatlabData.csv';
-        alkylnaphtalenes = readtable(data, 'VariableNamingRule', 'preserve');
-        nc_idx(1:numel(find(alkylnaphtalenes.nC == nc_MAP(l))),l) = find(alkylnaphtalenes.nC == nc_MAP(l));
-        eta_B_star_diff = abs(alkylnaphtalenes.eta_B_star_norm(nc_idx(1:numel(find(alkylnaphtalenes.nC == nc_MAP(l))),l)) - eta_B_star_MAP(l));
-        min_eta_B_star_diff = min(abs(alkylnaphtalenes.eta_B_star_norm(nc_idx(1:numel(find(alkylnaphtalenes.nC == nc_MAP(l))),l)) - eta_B_star_MAP(l)));
+    elseif strcmp(families(l), 'alkylnaphthalenes')
+        data = 'alkylnaphthalenes/alkylnaphthalenes_MatlabData.csv';
+        alkylnaphthalenes = readtable(data, 'VariableNamingRule', 'preserve');
+        nc_idx(1:numel(find(alkylnaphthalenes.nC == nc_MAP(l))),l) = find(alkylnaphthalenes.nC == nc_MAP(l));
+        eta_B_star_diff = abs(alkylnaphthalenes.eta_B_star_norm(nc_idx(1:numel(find(alkylnaphthalenes.nC == nc_MAP(l))),l)) - eta_B_star_MAP(l));
+        min_eta_B_star_diff = min(abs(alkylnaphthalenes.eta_B_star_norm(nc_idx(1:numel(find(alkylnaphthalenes.nC == nc_MAP(l))),l)) - eta_B_star_MAP(l)));
         row_MAP_idx(l) = find(eta_B_star_diff == min_eta_B_star_diff, 1);
 
-        names = 'alkylnaphtalenes/alkylnaphtalenes_Names.csv';
-        alkylnaphtalenes_names = readtable(names, 'VariableNamingRule', 'preserve');
+        names = 'alkylnaphthalenes/alkylnaphthalenes_Names.csv';
+        alkylnaphthalenes_names = readtable(names, 'VariableNamingRule', 'preserve');
 
-        species_MAP(l) = alkylnaphtalenes_names.Name(nc_idx(1,l) + row_MAP_idx(l) - 1);
-        Wi_MAP(l) = alkylnaphtalenes.W(nc_idx(1,l) + row_MAP_idx(l) - 1);
+        species_MAP(l) = alkylnaphthalenes_names.Name(nc_idx(1,l) + row_MAP_idx(l) - 1);
+        Wi_MAP(l) = alkylnaphthalenes.W(nc_idx(1,l) + row_MAP_idx(l) - 1);
     elseif strcmp(families(l), 'cycloaromatics')
         data = 'cycloaromatics/cycloaromatics_MatlabData.csv';
         cycloaromatics = readtable(data, 'VariableNamingRule', 'preserve');
@@ -142,6 +142,8 @@ for l = 1:numComponents
 
         species_MAP(l) = cycloaromatics_names.Name(nc_idx(1,l) + row_MAP_idx(l) - 1);
         Wi_MAP(l) = cycloaromatics.W(nc_idx(1,l) + row_MAP_idx(l) - 1);
+    else
+        error('Unknown hydrocarbon family: %s', families{l});
     end
 end
 
@@ -161,7 +163,7 @@ for l = 1:numComponents
         nHydrogen = nHydrogen + x_MAP(l)*(2*nc_MAP(l)-2);
     elseif strcmp(families(l), 'alkylbenzenes')
         nHydrogen = nHydrogen + x_MAP(l)*(2*nc_MAP(l)-6);
-    elseif strcmp(families(l), 'alkylnaphtalenes')
+    elseif strcmp(families(l), 'alkylnaphthalenes')
         nHydrogen = nHydrogen + x_MAP(l)*(2*nc_MAP(l)-12);
     elseif strcmp(families(l), 'cycloaromatics')
         nHydrogen = nHydrogen + x_MAP(l)*(2*nc_MAP(l)-8);
@@ -199,10 +201,10 @@ for i = 1:numComponents
         rho_i(i) = ThermophysicalProperties_SingleLiquid('rho', 300, alkylbenzenes.W(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Tc(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Arho(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Brho(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Crho(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Amu(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Bmu(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Cmu(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Dmu(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Ak(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Bk(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Ck(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Ac(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Bc(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Cc(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Dc(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Avap(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Bvap(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Asat(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Bsat(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Csat(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Dsat(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Esat(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Asigma(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Bsigma(nc_idx(1,i) + row_MAP_idx(i) - 1), 101325);
         numerator(i) = x_MAP(i)*alkylbenzenes.W(nc_idx(1,i) + row_MAP_idx(i) - 1);
         DCN_i(i) = alkylbenzenes.DCN(nc_idx(1,i) + row_MAP_idx(i) - 1);
-    elseif strcmp(families(i), 'alkylnaphtalenes')
-        rho_i(i) = ThermophysicalProperties_SingleLiquid('rho', 300, alkylnaphtalenes.W(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Tc(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Arho(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Brho(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Crho(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Amu(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Bmu(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Cmu(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Dmu(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Ak(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Bk(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Ck(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Ac(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Bc(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Cc(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Dc(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Avap(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Bvap(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Asat(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Bsat(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Csat(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Dsat(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Esat(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Asigma(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Bsigma(nc_idx(1,i) + row_MAP_idx(i) - 1), 101325);
-        numerator(i) = x_MAP(i)*alkylnaphtalenes.W(nc_idx(1,i) + row_MAP_idx(i) - 1);
-        DCN_i(i) = alkylnaphtalenes.DCN(nc_idx(1,i) + row_MAP_idx(i) - 1);
+    elseif strcmp(families(i), 'alkylnaphthalenes')
+        rho_i(i) = ThermophysicalProperties_SingleLiquid('rho', 300, alkylnaphthalenes.W(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Tc(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Arho(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Brho(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Crho(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Amu(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Bmu(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Cmu(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Dmu(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Ak(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Bk(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Ck(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Ac(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Bc(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Cc(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Dc(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Avap(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Bvap(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Asat(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Bsat(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Csat(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Dsat(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Esat(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Asigma(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Bsigma(nc_idx(1,i) + row_MAP_idx(i) - 1), 101325);
+        numerator(i) = x_MAP(i)*alkylnaphthalenes.W(nc_idx(1,i) + row_MAP_idx(i) - 1);
+        DCN_i(i) = alkylnaphthalenes.DCN(nc_idx(1,i) + row_MAP_idx(i) - 1);
     elseif strcmp(families(i), 'cycloaromatics')
         rho_i(i) = ThermophysicalProperties_SingleLiquid('rho', 300, cycloaromatics.W(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Tc(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Arho(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Brho(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Crho(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Amu(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Bmu(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Cmu(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Dmu(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Ak(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Bk(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Ck(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Ac(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Bc(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Cc(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Dc(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Avap(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Bvap(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Asat(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Bsat(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Csat(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Dsat(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Esat(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Asigma(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Bsigma(nc_idx(1,i) + row_MAP_idx(i) - 1), 101325);
         numerator(i) = x_MAP(i)*cycloaromatics.W(nc_idx(1,i) + row_MAP_idx(i) - 1);
@@ -221,6 +223,7 @@ DCN = sum(Vi_MAP.*DCN_i');
 % +++ Calculate the flash point in [K] of the MAP surrogate mixture
 flash_i = zeros(1,numComponents);
 BI_flash_i = zeros(1,numComponents);
+flash_F_i = zeros(1,numComponents);
 
 for i = 1:numComponents
     if strcmp(families(i), 'nparaffins')
@@ -233,19 +236,27 @@ for i = 1:numComponents
         flash_i(i) = dicycloparaffins.Tf(nc_idx(1,i) + row_MAP_idx(i) - 1);
     elseif strcmp(families(i), 'alkylbenzenes')
         flash_i(i) = alkylbenzenes.Tf(nc_idx(1,i) + row_MAP_idx(i) - 1);
-    elseif strcmp(families(i), 'alkylnaphtalenes')
-        flash_i(i) = alkylnaphtalenes.Tf(nc_idx(1,i) + row_MAP_idx(i) - 1);
+    elseif strcmp(families(i), 'alkylnaphthalenes')
+        flash_i(i) = alkylnaphthalenes.Tf(nc_idx(1,i) + row_MAP_idx(i) - 1);
     elseif strcmp(families(i), 'cycloaromatics')
         flash_i(i) = cycloaromatics.Tf(nc_idx(1,i) + row_MAP_idx(i) - 1);
     end
     flash_F = (flash_i(i)-273.15)*9./5+32; % flash point of the i-th MAP surrogate component in [°F]
-    BI_flash_i(i) = 51708*exp((log(flash_F)-2.6287)^2/(-0.91725));
+    flash_F_i(i) = flash_F;
+    if flash_F > 0
+        BI_flash_i(i) = 51708*exp((log(flash_F)-2.6287)^2/(-0.91725));
+    end
 end
 
-BI_blend = sum(y_MAP.*BI_flash_i);
-
-flash_point_F = exp(((-0.91725)*log(BI_blend/51708))^0.5+2.6287); % flash point of the MAP surrogate mixture in [°F]
-flash_point = (flash_point_F-32)*5./9+273.15; % flash point of the MAP surrogate mixture in [°F]
+if any(flash_F_i <= 0)
+    % ASTM D-7215 is undefined when a component has a flash point <= 0 degF (255.37 K)
+    flash_point = NaN;
+    warning('MAPwriter:flashPoint', 'Flash point set to NaN: ASTM D-7215 requires all component flash points to be above 0 degF (255.37 K).');
+else
+    BI_blend = sum(y_MAP.*BI_flash_i);
+    flash_point_F = exp(((-0.91725)*log(BI_blend/51708))^0.5+2.6287); % flash point of the MAP surrogate mixture in [°F]
+    flash_point = (flash_point_F-32)*5./9+273.15; % flash point of the MAP surrogate mixture in [K]
+end
 
 % +++ Calculate the freezing point in [K] of the MAP surrogate mixture
 rho_i = zeros(1,numComponents);
@@ -274,10 +285,10 @@ for i = 1:numComponents
         rho_i(i) = ThermophysicalProperties_SingleLiquid('rho', 300, alkylbenzenes.W(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Tc(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Arho(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Brho(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Crho(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Amu(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Bmu(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Cmu(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Dmu(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Ak(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Bk(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Ck(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Ac(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Bc(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Cc(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Dc(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Avap(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Bvap(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Asat(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Bsat(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Csat(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Dsat(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Esat(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Asigma(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylbenzenes.Bsigma(nc_idx(1,i) + row_MAP_idx(i) - 1), 101325);
         numerator(i) = x_MAP(i)*alkylbenzenes.W(nc_idx(1,i) + row_MAP_idx(i) - 1);
         freezing_i(i) = alkylbenzenes.Tfz(nc_idx(1,i) + row_MAP_idx(i) - 1);
-    elseif strcmp(families(i), 'alkylnaphtalenes')
-        rho_i(i) = ThermophysicalProperties_SingleLiquid('rho', 300, alkylnaphtalenes.W(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Tc(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Arho(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Brho(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Crho(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Amu(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Bmu(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Cmu(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Dmu(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Ak(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Bk(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Ck(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Ac(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Bc(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Cc(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Dc(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Avap(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Bvap(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Asat(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Bsat(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Csat(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Dsat(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Esat(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Asigma(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphtalenes.Bsigma(nc_idx(1,i) + row_MAP_idx(i) - 1), 101325);
-        numerator(i) = x_MAP(i)*alkylnaphtalenes.W(nc_idx(1,i) + row_MAP_idx(i) - 1);
-        freezing_i(i) = alkylnaphtalenes.Tfz(nc_idx(1,i) + row_MAP_idx(i) - 1);
+    elseif strcmp(families(i), 'alkylnaphthalenes')
+        rho_i(i) = ThermophysicalProperties_SingleLiquid('rho', 300, alkylnaphthalenes.W(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Tc(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Arho(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Brho(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Crho(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Amu(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Bmu(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Cmu(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Dmu(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Ak(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Bk(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Ck(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Ac(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Bc(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Cc(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Dc(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Avap(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Bvap(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Asat(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Bsat(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Csat(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Dsat(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Esat(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Asigma(nc_idx(1,i) + row_MAP_idx(i) - 1), alkylnaphthalenes.Bsigma(nc_idx(1,i) + row_MAP_idx(i) - 1), 101325);
+        numerator(i) = x_MAP(i)*alkylnaphthalenes.W(nc_idx(1,i) + row_MAP_idx(i) - 1);
+        freezing_i(i) = alkylnaphthalenes.Tfz(nc_idx(1,i) + row_MAP_idx(i) - 1);
     elseif strcmp(families(i), 'cycloaromatics')
         rho_i(i) = ThermophysicalProperties_SingleLiquid('rho', 300, cycloaromatics.W(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Tc(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Arho(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Brho(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Crho(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Amu(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Bmu(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Cmu(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Dmu(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Ak(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Bk(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Ck(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Ac(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Bc(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Cc(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Dc(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Avap(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Bvap(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Asat(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Bsat(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Csat(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Dsat(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Esat(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Asigma(nc_idx(1,i) + row_MAP_idx(i) - 1), cycloaromatics.Bsigma(nc_idx(1,i) + row_MAP_idx(i) - 1), 101325);
         numerator(i) = x_MAP(i)*cycloaromatics.W(nc_idx(1,i) + row_MAP_idx(i) - 1);
@@ -310,8 +321,8 @@ for i = 1:numComponents
         LHV_i(i) = dicycloparaffins.Hc(nc_idx(1,i) + row_MAP_idx(i) - 1);
     elseif strcmp(families(i), 'alkylbenzenes')
         LHV_i(i) = alkylbenzenes.Hc(nc_idx(1,i) + row_MAP_idx(i) - 1);
-    elseif strcmp(families(i), 'alkylnaphtalenes')
-        LHV_i(i) = alkylnaphtalenes.Hc(nc_idx(1,i) + row_MAP_idx(i) - 1);
+    elseif strcmp(families(i), 'alkylnaphthalenes')
+        LHV_i(i) = alkylnaphthalenes.Hc(nc_idx(1,i) + row_MAP_idx(i) - 1);
     elseif strcmp(families(i), 'cycloaromatics')
         LHV_i(i) = cycloaromatics.Hc(nc_idx(1,i) + row_MAP_idx(i) - 1);
     end
@@ -345,9 +356,9 @@ for i = 1:numComponents
         elseif strcmp(families(i), 'alkylbenzenes')
             Vc_i = alkylbenzenes.Vc(nc_idx(1,i) + row_MAP_idx(i) - 1);
             Tc_i = alkylbenzenes.Tc(nc_idx(1,i) + row_MAP_idx(i) - 1);
-        elseif strcmp(families(i), 'alkylnaphtalenes')
-            Vc_i = alkylnaphtalenes.Vc(nc_idx(1,i) + row_MAP_idx(i) - 1);
-            Tc_i = alkylnaphtalenes.Tc(nc_idx(1,i) + row_MAP_idx(i) - 1);
+        elseif strcmp(families(i), 'alkylnaphthalenes')
+            Vc_i = alkylnaphthalenes.Vc(nc_idx(1,i) + row_MAP_idx(i) - 1);
+            Tc_i = alkylnaphthalenes.Tc(nc_idx(1,i) + row_MAP_idx(i) - 1);
         elseif strcmp(families(i), 'cycloaromatics')
             Vc_i = cycloaromatics.Vc(nc_idx(1,i) + row_MAP_idx(i) - 1);
             Tc_i = cycloaromatics.Tc(nc_idx(1,i) + row_MAP_idx(i) - 1);
@@ -368,9 +379,9 @@ for i = 1:numComponents
         elseif strcmp(families(j), 'alkylbenzenes')
             Vc_j = alkylbenzenes.Vc(nc_idx(1,j) + row_MAP_idx(j) - 1);
             Tc_j = alkylbenzenes.Tc(nc_idx(1,j) + row_MAP_idx(j) - 1);
-        elseif strcmp(families(j), 'alkylnaphtalenes')
-            Vc_j = alkylnaphtalenes.Vc(nc_idx(1,j) + row_MAP_idx(j) - 1);
-            Tc_j = alkylnaphtalenes.Tc(nc_idx(1,j) + row_MAP_idx(j) - 1);
+        elseif strcmp(families(j), 'alkylnaphthalenes')
+            Vc_j = alkylnaphthalenes.Vc(nc_idx(1,j) + row_MAP_idx(j) - 1);
+            Tc_j = alkylnaphthalenes.Tc(nc_idx(1,j) + row_MAP_idx(j) - 1);
         elseif strcmp(families(j), 'cycloaromatics')
             Vc_j = cycloaromatics.Vc(nc_idx(1,j) + row_MAP_idx(j) - 1);
             Tc_j = cycloaromatics.Tc(nc_idx(1,j) + row_MAP_idx(j) - 1);
@@ -395,8 +406,8 @@ for i = 1:numComponents
         omega_i = dicycloparaffins.omega(nc_idx(1,i) + row_MAP_idx(i) - 1);
     elseif strcmp(families(i), 'alkylbenzenes')
         omega_i = alkylbenzenes.omega(nc_idx(1,i) + row_MAP_idx(i) - 1);
-    elseif strcmp(families(i), 'alkylnaphtalenes')
-        omega_i = alkylnaphtalenes.omega(nc_idx(1,i) + row_MAP_idx(i) - 1);
+    elseif strcmp(families(i), 'alkylnaphthalenes')
+        omega_i = alkylnaphthalenes.omega(nc_idx(1,i) + row_MAP_idx(i) - 1);
     elseif strcmp(families(i), 'cycloaromatics')
         omega_i = cycloaromatics.omega(nc_idx(1,i) + row_MAP_idx(i) - 1);
     end

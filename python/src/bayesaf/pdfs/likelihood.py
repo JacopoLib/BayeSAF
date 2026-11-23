@@ -178,10 +178,12 @@ def _h_to_carbon_ratio(
             n_hydrogen += mol_frac_mat[:, j] * (2 * n_all[:, j] - 2)
         elif fam == "alkylbenzenes":
             n_hydrogen += mol_frac_mat[:, j] * (2 * n_all[:, j] - 6)
-        elif fam in ("alkylnaphtalenes", "alkylnaphthalenes"):
+        elif fam == "alkylnaphthalenes":
             n_hydrogen += mol_frac_mat[:, j] * (2 * n_all[:, j] - 12)
         elif fam == "cycloaromatics":
             n_hydrogen += mol_frac_mat[:, j] * (2 * n_all[:, j] - 8)
+        else:
+            raise ValueError(f"Unknown hydrocarbon family for the H/C ratio: {fam!r}")
     n_carbon = np.round((mol_frac_mat * n_all).sum(axis=1), 2)
     return np.round(n_hydrogen / n_carbon, 3)
 

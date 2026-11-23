@@ -80,7 +80,7 @@ _FAMILY_CSV: dict[str, str] = {
     "cycloparaffins": "cycloparaffins/cycloparaffins_MatlabData.csv",
     "dicycloparaffins": "dicycloparaffins/dicycloparaffins_MatlabData.csv",
     "alkylbenzenes": "alkylbenzenes/alkylbenzenes_MatlabData.csv",
-    "alkylnaphthalenes": "alkylnaphtalenes/alkylnaphtalenes_MatlabData.csv",
+    "alkylnaphthalenes": "alkylnaphthalenes/alkylnaphthalenes_MatlabData.csv",
     "cycloaromatics": "cycloaromatics/cycloaromatics_MatlabData.csv",
 }
 

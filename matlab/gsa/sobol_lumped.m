@@ -72,7 +72,7 @@ function sobol_idx = sobol_lumped(families, classes, numComponents, chain_reshap
 % Outputs:
 % 1) sobol_idx: (3 x 1) array containing the grouped first-order Sobol' indices
 
-rng('default'); % to ensure reproducibility
+rng_sobol = RandStream('twister', 'Seed', 0); % local stream, to ensure reproducibility without touching the global generator
 
 % Remove duplicate samples
 [samples,samples_indices]=unique(round(chain_reshaped,6),'rows');
@@ -86,7 +86,7 @@ else
 end
 
 % Randomly permute the row indices
-permutedIndices = randperm(size(samples,1));
+permutedIndices = randperm(rng_sobol, size(samples,1));
 
 % Split the permuted indices into two sets
 indicesA = permutedIndices(1:numel(permutedIndices)/2);
@@ -158,7 +158,7 @@ for p = 1:size(A_B,1)
                 nHydrogen = nHydrogen + molFrac_AB(p,l)*(2*nC_AB(p,l)-2);
             elseif strcmp(families(l), 'alkylbenzenes')
                 nHydrogen = nHydrogen + molFrac_AB(p,l)*(2*nC_AB(p,l)-6);
-            elseif strcmp(families(l), 'alkylnaphtalenes')
+            elseif strcmp(families(l), 'alkylnaphthalenes')
                 nHydrogen = nHydrogen + molFrac_AB(p,l)*(2*nC_AB(p,l)-12);
             elseif strcmp(families(l), 'cycloaromatics')
                 nHydrogen = nHydrogen + molFrac_AB(p,l)*(2*nC_AB(p,l)-8);
@@ -302,7 +302,7 @@ for p = 1:size(A_B,1)
                 nHydrogen = nHydrogen + molFrac_AB(p,l)*(2*nC_AB(p,l)-2);
             elseif strcmp(families(l), 'alkylbenzenes')
                 nHydrogen = nHydrogen + molFrac_AB(p,l)*(2*nC_AB(p,l)-6);
-            elseif strcmp(families(l), 'alkylnaphtalenes')
+            elseif strcmp(families(l), 'alkylnaphthalenes')
                 nHydrogen = nHydrogen + molFrac_AB(p,l)*(2*nC_AB(p,l)-12);
             elseif strcmp(families(l), 'cycloaromatics')
                 nHydrogen = nHydrogen + molFrac_AB(p,l)*(2*nC_AB(p,l)-8);
@@ -446,7 +446,7 @@ for p = 1:size(A_B,1)
                 nHydrogen = nHydrogen + molFrac_AB(p,l)*(2*nC_AB(p,l)-2);
             elseif strcmp(families(l), 'alkylbenzenes')
                 nHydrogen = nHydrogen + molFrac_AB(p,l)*(2*nC_AB(p,l)-6);
-            elseif strcmp(families(l), 'alkylnaphtalenes')
+            elseif strcmp(families(l), 'alkylnaphthalenes')
                 nHydrogen = nHydrogen + molFrac_AB(p,l)*(2*nC_AB(p,l)-12);
             elseif strcmp(families(l), 'cycloaromatics')
                 nHydrogen = nHydrogen + molFrac_AB(p,l)*(2*nC_AB(p,l)-8);

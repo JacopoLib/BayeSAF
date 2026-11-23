@@ -68,68 +68,41 @@ variable_names = cell(1,numel(Dataset));
 
 for i = 1:numel(Dataset)
 
-    if contains(Dataset{i},'rho')
-        variable_name = 'rho';
-    end
-
-    if contains(Dataset{i},'mu')
-        variable_name = 'mu';
-    end
-
-    if contains(Dataset{i},'nu')
-        variable_name = 'nu';
-    end
-
-    if contains(Dataset{i},'kappa')
-        variable_name = 'kappa';
-    end
-
-    if contains(Dataset{i},'specificHeat')
-        variable_name = 'specificHeat';
-    end
-
-    if contains(Dataset{i},'latentHeat')
-        variable_name = 'latentHeat';
-    end
-
-    if contains(Dataset{i},'vaporPressure')
-        variable_name = 'vaporPressure';
-    end
-
-    if contains(Dataset{i},'sigma')
-        variable_name = 'sigma';
-    end
-
-    if contains(Dataset{i},'distillation')
-        variable_name = 'distillation';
-    end
-
+    % Detect the property from the name of the dataset: the first match in this order decides
     if contains(Dataset{i},'deltaT_dist')
         variable_name = 'deltaT_dist';
-    end
-
-    if contains(Dataset{i},'molWeight')
+    elseif contains(Dataset{i},'distillation')
+        variable_name = 'distillation';
+    elseif contains(Dataset{i},'molWeight')
         variable_name = 'molWeight';
-    end
-
-    if contains(Dataset{i},'HC')
+    elseif contains(Dataset{i},'specificHeat')
+        variable_name = 'specificHeat';
+    elseif contains(Dataset{i},'latentHeat')
+        variable_name = 'latentHeat';
+    elseif contains(Dataset{i},'vaporPressure')
+        variable_name = 'vaporPressure';
+    elseif contains(Dataset{i},'kappa')
+        variable_name = 'kappa';
+    elseif contains(Dataset{i},'sigma')
+        variable_name = 'sigma';
+    elseif contains(Dataset{i},'rho')
+        variable_name = 'rho';
+    elseif contains(Dataset{i},'mu')
+        variable_name = 'mu';
+    elseif contains(Dataset{i},'nu')
+        variable_name = 'nu';
+    elseif contains(Dataset{i},'HC')
         variable_name = 'HC';
-    end
-
-    if contains(Dataset{i},'DCN')
+    elseif contains(Dataset{i},'DCN')
         variable_name = 'DCN';
-    end
-
-    if contains(Dataset{i},'flash')
+    elseif contains(Dataset{i},'flash')
         variable_name = 'flash';
-    end
-
-    if contains(Dataset{i},'freezing')
+    elseif contains(Dataset{i},'freezing')
         variable_name = 'freezing';
-    end
-
-    if contains(Dataset{i},'LHV')
+    elseif contains(Dataset{i},'LHV')
         variable_name = 'LHV';
+    else
+        error('Cannot detect the thermophysical property from the dataset name: %s', Dataset{i});
     end
 
     variable_names{i} = variable_name;
@@ -143,13 +116,13 @@ for i = 1:numel(Dataset)
     % Import experimental data and calculate the standard deviation associated with experimental results
     data_import = table2array(readtable(Dataset{i}, 'VariableNamingRule', 'preserve'));
 
-    if contains(Dataset{i},'distillation') || contains(Dataset{i},'deltaT_dist') || contains(Dataset{i},'molWeight') || contains(Dataset{i},'HC') || contains(Dataset{i},'DCN') || contains(Dataset{i},'flash') || contains(Dataset{i},'freezing') || contains(Dataset{i},'LHV')
+    if ismember(variable_name, {'distillation','deltaT_dist','molWeight','HC','DCN','flash','freezing','LHV'})
         data = data_import;
     else
         data = data_import(0.999*T_threshold > data_import(:, 1), :);
     end
 
-    if ~contains(Dataset{i},'distillation') || ~contains(Dataset{i},'deltaT_dist')
+    if ~ismember(variable_name, {'distillation','deltaT_dist'})
         minT_array(i) = min(data(:,1));
         maxT_array(i) = max(data(:,1));
     else

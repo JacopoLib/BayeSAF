@@ -54,7 +54,7 @@
 
 function [x_MAP, nc_MAP, eta_B_star_MAP] = MAPfinder(posterior, chain, numComponents)
 
-[~, max_posterior_index] = maxk(posterior(:,1), 1);
+[~, max_posterior_index] = maxk(posterior(:), 1);
 x_MAP = chain(max_posterior_index,1:numComponents-1);
 x_MAP = [x_MAP, 1-sum(x_MAP)];
 nc_MAP = chain(max_posterior_index,numComponents:2*numComponents-1);

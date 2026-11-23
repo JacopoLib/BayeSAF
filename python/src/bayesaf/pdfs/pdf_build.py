@@ -71,7 +71,7 @@ from .likelihood import log_likelihood, log_likelihood_cheap
 #   fn(X_all, N_all, Eta_all) → ndarray(N_samples,)
 PDFFn = Callable[[np.ndarray, np.ndarray, np.ndarray], np.ndarray]
 
-# Standard deviations: for scalar properties use col 1 (*10), else col 2 (*10)
+# Standard deviations: column 1 for the scalar properties, column 2 for the others
 _SCALAR_VARS = {"molWeight", "HC", "DCN", "flash", "freezing", "LHV"}
 
 

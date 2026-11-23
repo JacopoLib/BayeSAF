@@ -51,7 +51,7 @@
 
 function sobol_idx = sobol_distillation(classes, numComponents, chain_reshaped, model_output_samples, pressure_distillation)
 
-rng('default');
+rng_sobol = RandStream('twister', 'Seed', 0); % local stream: the global generator is left untouched
 
 [samples, samples_indices] = unique(round(chain_reshaped, 6), 'rows');
 new_output = model_output_samples(samples_indices, :);
@@ -60,7 +60,7 @@ if mod(size(samples, 1), 2) ~= 0
     samples(end,:) = [];
 end
 
-permutedIndices = randperm(size(samples, 1));
+permutedIndices = randperm(rng_sobol, size(samples, 1));
 indicesA = permutedIndices(1:numel(permutedIndices)/2);
 indicesB = permutedIndices(numel(permutedIndices)/2+1:end);
 

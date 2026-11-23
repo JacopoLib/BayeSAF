@@ -40,7 +40,7 @@
 % 1) class   : string denoting the hydrocarbon family
 %              ('nparaffins', 'isoparaffins', 'cycloparaffins',
 %               'dicycloparaffins', 'alkylbenzenes',
-%               'alkylnaphtalenes', 'cycloaromatics')
+%               'alkylnaphthalenes', 'cycloaromatics')
 % 2) nc_range: vector of carbon-atom counts to include
 %
 % Outputs:
@@ -54,14 +54,17 @@ isoparaffins   = readtable('isoparaffins_MatlabData.csv',   'VariableNamingRule'
 cycloparaffins = readtable('cycloparaffins_MatlabData.csv', 'VariableNamingRule', 'preserve');
 dicycloparaffins  = readtable('dicycloparaffins_MatlabData.csv',  'VariableNamingRule', 'preserve');
 alkylbenzenes     = readtable('alkylbenzenes_MatlabData.csv',     'VariableNamingRule', 'preserve');
-alkylnaphtalenes  = readtable('alkylnaphtalenes_MatlabData.csv',  'VariableNamingRule', 'preserve');
+alkylnaphthalenes  = readtable('alkylnaphthalenes_MatlabData.csv',  'VariableNamingRule', 'preserve');
 cycloaromatics    = readtable('cycloaromatics_MatlabData.csv',    'VariableNamingRule', 'preserve');
 
 % ── First pass: count total number of matching species ──────────────────
 struct_size = 0;
 for i = 1:numel(nc_range)
     nc_idx = get_nc_idx(class, nc_range(i), nparaffins, isoparaffins, ...
-        cycloparaffins, dicycloparaffins, alkylbenzenes, alkylnaphtalenes, cycloaromatics);
+        cycloparaffins, dicycloparaffins, alkylbenzenes, alkylnaphthalenes, cycloaromatics);
+    if isempty(nc_idx)
+        error('Hydrocarbons:noSpecies', 'The database has no species of the family ''%s'' with %d carbon atoms.', class, nc_range(i));
+    end
     struct_size = struct_size + numel(nc_idx);
 end
 
@@ -88,10 +91,10 @@ counter = 1;
 for i = 1:numel(nc_range)
     nc     = nc_range(i);
     nc_idx = get_nc_idx(class, nc, nparaffins, isoparaffins, ...
-        cycloparaffins, dicycloparaffins, alkylbenzenes, alkylnaphtalenes, cycloaromatics);
+        cycloparaffins, dicycloparaffins, alkylbenzenes, alkylnaphthalenes, cycloaromatics);
 
     tbl = get_table(class, nparaffins, isoparaffins, cycloparaffins, ...
-        dicycloparaffins, alkylbenzenes, alkylnaphtalenes, cycloaromatics);
+        dicycloparaffins, alkylbenzenes, alkylnaphthalenes, cycloaromatics);
 
     for j = 1:numel(nc_idx)
         r = nc_idx(j);
