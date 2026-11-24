@@ -267,45 +267,68 @@ x_archive = zeros(maxIterations,nParams,N_chains);
 % Create initial population by sampling mole fractions uniformly on the simplex and fulfilling constraints from the informative priors
 t = 1;
 Nneeded = 10 * N_chains;
-validSamples = [];
 
 K = numComponents; % total components
 K_rest = 2 * K; % numbers of carbon atoms and topochemical atom indices
 
 batchSize = max(1000, 5 * Nneeded);
 
-while size(validSamples, 1) < Nneeded
+% Only candidates with a finite log-posterior (inside every prior bound, eta included) are kept,
+% so that no chain starts at -Inf
+X_lhs = zeros(0, nParams);
+phys_lhs = zeros(0, nParams);
+p_X_lhs = zeros(0, 1);
 
-    % --- 1) Sample mole fractions uniformly on the simplex (Dirichlet(1))
-    Y = -log(rand(batchSize, K));     % Exponential(1)
-    DirSamples = Y ./ sum(Y, 2);      % Normalize → each row sums to 1
+for initRound = 1:100
 
-    % --- 2) Check per-component lower/upper bounds
-    lb = LowerBound_x(:)';
-    ub = UpperBound_x(:)';
+    validSamples = [];
 
-    ok_mask = all((DirSamples >= lb) & (DirSamples <= ub), 2);
-    val_dir = DirSamples(ok_mask, :);
+    while size(validSamples, 1) < Nneeded
 
-    if isempty(val_dir)
-        continue
+        % --- 1) Sample mole fractions uniformly on the simplex (Dirichlet(1))
+        Y = -log(rand(batchSize, K));     % Exponential(1)
+        DirSamples = Y ./ sum(Y, 2);      % Normalize → each row sums to 1
+
+        % --- 2) Check per-component lower/upper bounds
+        lb = LowerBound_x(:)';
+        ub = UpperBound_x(:)';
+
+        ok_mask = all((DirSamples >= lb) & (DirSamples <= ub), 2);
+        val_dir = DirSamples(ok_mask, :);
+
+        if isempty(val_dir)
+            continue
+        end
+
+        % --- 3) Compute normalized mole fractions (for first K-1 components)
+        val_norm = (val_dir(:, 1:K-1) - lb(1:K-1)) ./ (ub(1:K-1) - lb(1:K-1));
+
+        % --- 4) Generate random values for remaining parameters in [0,1]
+        n_valid = size(val_norm, 1);
+        lhs_rest_cont = rand(n_valid, K_rest);
+
+        % --- 5) Combine into one array
+        validSamples = [validSamples; [val_norm, lhs_rest_cont]];
+
     end
 
-    % --- 3) Compute normalized mole fractions (for first K-1 components)
-    val_norm = (val_dir(:, 1:K-1) - lb(1:K-1)) ./ (ub(1:K-1) - lb(1:K-1));
+    phys_new = decode_rows(validSamples, isomers, n_ranges, LowerBound_x, UpperBound_x);
+    p_new = posterior_rows(Posterior_PDF, phys_new);     % Compute density of the candidates
+    fin = isfinite(p_new(:));
 
-    % --- 4) Generate random values for remaining parameters in [0,1]
-    n_valid = size(val_norm, 1);
-    lhs_rest_cont = rand(n_valid, K_rest);
+    X_lhs = [X_lhs; validSamples(fin, :)];
+    phys_lhs = [phys_lhs; phys_new(fin, :)];
+    p_X_lhs = [p_X_lhs; p_new(fin)];
 
-    % --- 5) Combine into one array
-    validSamples = [validSamples; [val_norm, lhs_rest_cont]];
+    if size(X_lhs, 1) >= Nneeded
+        break
+    end
+    if initRound == 100
+        error('DifferentialEvolutionMarkovChain:init', ...
+            'No initial state with finite posterior was found; check the eta/molar-fraction bounds and the data.');
+    end
 
 end
-
-X_lhs = validSamples;
-phys_lhs = decode_rows(X_lhs, isomers, n_ranges, LowerBound_x, UpperBound_x);
-p_X_lhs = posterior_rows(Posterior_PDF, phys_lhs);     % Compute density initial population
 
 N = size(phys_lhs,1);
 selectedIdx = zeros(N_chains,1);

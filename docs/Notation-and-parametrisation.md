@@ -120,13 +120,17 @@ Proposals can leave `[0, 1]`.
    molar fractions lie inside the bounds. The target is `10 * N_chains` valid samples.
 2. Normalise the first `Nc - 1` fractions to `[0, 1]` and draw the `2*Nc` coordinates of `n_C` and
    `eta` uniformly.
-3. Decode, evaluate the posterior on all samples, and select `N_chains` points by a greedy max-min
-   distance rule in physical space (first point random, then the point farthest from the selected
-   ones).
+3. Decode and evaluate the posterior on all samples. Candidates with a non-finite log-posterior
+   (for example `eta` outside `LOWER_ETA`/`UPPER_ETA`) are discarded and the draw is repeated until
+   `10 * N_chains` finite candidates are available (error after 100 rounds). Then select `N_chains`
+   points by a greedy max-min distance rule in physical space (first point random, then the point
+   farthest from the selected ones).
 4. Shuffle the order.
 
 The initial population always uses a uniform Dirichlet, whatever `ALPHA_DIRICHLET` is. The initial
-molar fractions are also required to satisfy the bounds on all `Nc` fractions.
+molar fractions are also required to satisfy the bounds on all `Nc` fractions. The `eta` coordinate
+is drawn uniformly on [0, 1] regardless of the `eta` bounds; the bounds act through the prior, so the
+finite-posterior filter above is what keeps the initial states inside them.
 
 ## Constant-`eta` families
 
@@ -150,6 +154,6 @@ R-hat test (`rhat_skip`) and appears as `NaN` in `R_hat`.
 - **Index base.** All column indices below are 1-based in MATLAB: the molar fractions are columns `1..Nc-1`
   (`cols_x`), the carbon numbers `Nc..2Nc-1` (`cols_nc`), the topochemical indices `2Nc..3Nc-1` (`cols_eta`).
 - **Initial population.** Same procedure as in Python: Dirichlet(1) within the bounds, uniform coordinates for the rest,
-  greedy max-min distance selection with `pdist2`, random permutation.
+  candidates with a non-finite log-posterior discarded, greedy max-min distance selection with `pdist2`, random permutation.
 - **Family keys.** `Hydrocarbons.m` accepts `nparaffins`, `isoparaffins`, `cycloparaffins`, `dicycloparaffins`,
   `alkylbenzenes`, `alkylnaphthalenes` and `cycloaromatics`; the other modules use the same keys, and an unknown family stops with an error.

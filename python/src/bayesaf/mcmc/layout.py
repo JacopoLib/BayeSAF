@@ -375,8 +375,9 @@ class SurrogateLayout(ParameterLayout):
         Sample an initial population on the parameter space.
 
         Dirichlet(1) molar fractions within bounds and uniform nC/eta
-        coordinates; N_chains diverse points are then picked by greedy
-        max-min distance in physical space.
+        coordinates; candidates with a non-finite log-posterior (e.g. eta
+        outside its bounds) are discarded, then N_chains diverse points are
+        picked by greedy max-min distance in physical space.
         """
         unit = self.units[0]
         Nc = unit.Nc
@@ -386,32 +387,49 @@ class SurrogateLayout(ParameterLayout):
         K_rest = 2 * Nc   # nC (Nc) + eta (Nc)
         lb, ub = unit.lower_bound_x, unit.upper_bound_x
 
-        valid_samples = np.empty((0, n_params), dtype=float)
+        X_ok = np.empty((0, n_params), dtype=float)
+        phys_ok = np.empty((0, n_params), dtype=float)
+        p_ok = np.empty(0, dtype=float)
 
-        while valid_samples.shape[0] < N_needed:
-            # Dirichlet(1) samples
-            Y = -np.log(rng.random_sample((batch, Nc)))
-            dir_samples = Y / Y.sum(axis=1, keepdims=True)
+        # Only candidates with a finite log-posterior (inside every prior bound,
+        # eta included) are kept, so that no chain starts at -inf.
+        for _ in range(100):
+            valid_samples = np.empty((0, n_params), dtype=float)
+            while valid_samples.shape[0] < N_needed:
+                # Dirichlet(1) samples
+                Y = -np.log(rng.random_sample((batch, Nc)))
+                dir_samples = Y / Y.sum(axis=1, keepdims=True)
 
-            ok = np.all((dir_samples >= lb) & (dir_samples <= ub), axis=1)
-            val_dir = dir_samples[ok]
-            if val_dir.shape[0] == 0:
-                continue
+                ok = np.all((dir_samples >= lb) & (dir_samples <= ub), axis=1)
+                val_dir = dir_samples[ok]
+                if val_dir.shape[0] == 0:
+                    continue
 
-            # Normalise molar fractions to [0,1]
-            val_norm = (val_dir[:, :Nc - 1] - lb[:Nc - 1]) / (ub[:Nc - 1] - lb[:Nc - 1])
-            n_valid = val_norm.shape[0]
-            rest = rng.random_sample((n_valid, K_rest))
-            batch_samples = np.hstack([val_norm, rest])
-            valid_samples = np.vstack([valid_samples, batch_samples])
+                # Normalise molar fractions to [0,1]
+                val_norm = (val_dir[:, :Nc - 1] - lb[:Nc - 1]) / (ub[:Nc - 1] - lb[:Nc - 1])
+                n_valid = val_norm.shape[0]
+                rest = rng.random_sample((n_valid, K_rest))
+                batch_samples = np.hstack([val_norm, rest])
+                valid_samples = np.vstack([valid_samples, batch_samples])
 
-        # Decode physical parameters for all valid samples
-        X_lhs = valid_samples.copy()
-        phys_lhs = np.zeros_like(X_lhs)
-        unit.decode(valid_samples, phys_lhs)
+            # Decode physical parameters and compute the posterior
+            phys_new = np.zeros_like(valid_samples)
+            unit.decode(valid_samples, phys_new)
+            p_new = posterior_fn(*self.posterior_args(phys_new))
 
-        # Compute posterior for all samples
-        p_lhs = posterior_fn(*self.posterior_args(phys_lhs))
+            fin = np.isfinite(p_new)
+            X_ok = np.vstack([X_ok, valid_samples[fin]])
+            phys_ok = np.vstack([phys_ok, phys_new[fin]])
+            p_ok = np.concatenate([p_ok, p_new[fin]])
+            if p_ok.shape[0] >= N_needed:
+                break
+        else:
+            raise RuntimeError(
+                "init_population: no initial state with finite posterior was found; "
+                "check the eta/molar-fraction bounds and the data"
+            )
+
+        X_lhs, phys_lhs, p_lhs = X_ok, phys_ok, p_ok
 
         # Select N_chains diverse initial points (max-min-distance greedy)
         N = phys_lhs.shape[0]
