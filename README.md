@@ -36,7 +36,7 @@ matlab/      MATLAB implementation
 python/      Python implementation (installable package `bayesaf`)
   src/bayesaf/            same modules as the MATLAB version
   examples/CHRJ_3comp/    the same example in Python
-database/    hydrocarbon property database: 7 molecular groups, one folder each
+database/    hydrocarbon property database: 7 molecular groups, one folder each (CSV files and an annotated Excel table)
 exp/         experimental targets of the real fuel (CHRJ_POSF6152)
 docs/        documentation of the MATLAB and Python implementations
 img/         figures used in this README

@@ -18,13 +18,14 @@ One directory per hydrocarbon family. The directory name and the family key used
 | `alkylnaphthalenes` | `alkylnaphthalenes/` | |
 | `cycloaromatics` | `cycloaromatics/` | |
 
-Each directory contains three semicolon-separated CSV files:
+Each directory contains three semicolon-separated CSV files, read by the code, and an annotated Excel table:
 
 | File | Content |
 |---|---|
 | `<family>_MatlabData.csv` | the data read by `load_hydrocarbons` |
 | `<family>_Names.csv` | `Name; eta_B_star; eta_B_star_norm`, row-aligned with the data file |
 | `<family>_SMILES.csv` | SMILES of each species |
+| `<family>.xlsx` | annotated table of the same values, not read by the code ([below](#what-the-database-contains)) |
 
 ### What the database contains
 
