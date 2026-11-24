@@ -38,6 +38,7 @@ The outputs are the maximum-a-posteriori (MAP) surrogate, the posterior samples,
 | [Thermophysical models](Thermophysical-models.md) | Yaws formulas, mixing rules, flash and distillation curve |
 | [Sampler](Sampler.md) | DE-MC moves, delayed acceptance, tempering, burn-in, convergence |
 | [Differences between the Python and MATLAB implementations](Differences-Python-MATLAB.md) | what differs, and what is the same |
+| [References](References.md) | works cited in the documentation |
 
 Each methodology page starts with a table that maps the concepts to the Python and MATLAB code, and ends with a section on the MATLAB implementation. The text in between
 quotes Python names (`run_demc`, `log_likelihood`, ...).

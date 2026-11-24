@@ -30,7 +30,7 @@
 % ThermophysicalProperties_LiquidMixture_speed evaluates a liquid-mixture
 % thermophysical property for multiple MCMC samples in a vectorized
 % fashion. Mixing rules: volume-weighted (rho), log-linear (mu),
-% mass-weighted (kappa, specificHeat, latentHeat, vaporPressure),
+% Li's method (kappa), mass-weighted (specificHeat, latentHeat, vaporPressure),
 % molar-weighted (sigma).
 %
 % Inputs:
@@ -104,7 +104,48 @@ switch property
         mu  = ThermophysicalProperties_LiquidMixture_speed('mu',  T, X_all, classes, index_n_eta_all, pressure);
         phi = mu ./ rho;
 
-    case {'kappa', 'specificHeat', 'latentHeat', 'vaporPressure'}
+    case 'kappa'
+        % Li's method: k_mix = sum_i sum_j psi_i psi_j K_ij, with the superficial
+        % volume fractions psi_i = X_i W_i / rho_i (normalised) and
+        % K_ij = 2 / (1/k_i + 1/k_j)
+        k_mat = zeros(N_samples, N_exp, Nc);
+        v_mat = zeros(N_samples, N_exp, Nc);
+
+        for i = 1:Nc
+            idx_i = index_n_eta_all(:, i);
+            for j = 1:N_samples
+                sp = classes{i}(idx_i(j));
+                k_mat(j,:,i) = ThermophysicalProperties_SingleLiquid('kappa', T, ...
+                    sp.molWeight, sp.Tc, ...
+                    sp.coeffRho(1), sp.coeffRho(2), sp.coeffRho(3), ...
+                    sp.coeffMu(1),  sp.coeffMu(2),  sp.coeffMu(3),  sp.coeffMu(4), ...
+                    sp.coeffK(1),   sp.coeffK(2),   sp.coeffK(3), ...
+                    sp.coeffCl(1),  sp.coeffCl(2),  sp.coeffCl(3),  sp.coeffCl(4), ...
+                    sp.coeffHv(1),  sp.coeffHv(2), ...
+                    sp.coeffPsat(1), sp.coeffPsat(2), sp.coeffPsat(3), sp.coeffPsat(4), sp.coeffPsat(5), ...
+                    sp.coeffSigma(1), sp.coeffSigma(2), pressure);
+                v_mat(j,:,i) = X_full(j,i) * sp.molWeight ./ ...
+                    ThermophysicalProperties_SingleLiquid('rho', T, ...
+                    sp.molWeight, sp.Tc, ...
+                    sp.coeffRho(1), sp.coeffRho(2), sp.coeffRho(3), ...
+                    sp.coeffMu(1),  sp.coeffMu(2),  sp.coeffMu(3),  sp.coeffMu(4), ...
+                    sp.coeffK(1),   sp.coeffK(2),   sp.coeffK(3), ...
+                    sp.coeffCl(1),  sp.coeffCl(2),  sp.coeffCl(3),  sp.coeffCl(4), ...
+                    sp.coeffHv(1),  sp.coeffHv(2), ...
+                    sp.coeffPsat(1), sp.coeffPsat(2), sp.coeffPsat(3), sp.coeffPsat(4), sp.coeffPsat(5), ...
+                    sp.coeffSigma(1), sp.coeffSigma(2), pressure);
+            end
+        end
+
+        psi = v_mat ./ sum(v_mat, 3);
+        phi = zeros(N_samples, N_exp);
+        for i = 1:Nc
+            for k = 1:Nc
+                phi = phi + psi(:,:,i) .* psi(:,:,k) .* 2 ./ (1 ./ k_mat(:,:,i) + 1 ./ k_mat(:,:,k));
+            end
+        end
+
+    case {'specificHeat', 'latentHeat', 'vaporPressure'}
         numerator   = zeros(N_samples, N_exp, Nc);
         denominator = zeros(N_samples, Nc);
 

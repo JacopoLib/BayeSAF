@@ -9,12 +9,12 @@
 
 | Output | Size | Content |
 |---|---|---|
-| `chain` (`x`) | `t_convergence x (3*Nc-1) x n_cold` | **physical** parameters of the cold chains (molar fractions, carbon numbers, `eta_B_star_norm`) |
+| `chain` (`x`) | `t_convergence x (3*N_s-1) x n_cold` | **physical** parameters of the cold chains (molar fractions, carbon numbers, `eta_B_star_norm`) |
 | `posterior_pdf` (`p_x`) | `t_convergence x n_cold` | log-posterior (with the isomer correction) |
-| `chain_reshaped` (`x_nb`) | `((t_convergence - t_burn) * n_cold) x (3*Nc-1)` | post-burn-in samples of all the cold chains stacked |
+| `chain_reshaped` (`x_nb`) | `((t_convergence - t_burn) * n_cold) x (3*N_s-1)` | post-burn-in samples of all the cold chains stacked |
 | `posterior_pdf_reshaped` (`p_x_nb`) | column vector | corresponding log-posterior |
 | `AR` | `t_convergence x n_cold` | cumulative acceptance rate in percent |
-| `R_hat` | `n_checks x (3*Nc-1)` | R-hat every 2 iterations after the burn-in; `NaN` for the constant `eta` columns |
+| `R_hat` | `n_checks x (3*N_s-1)` | R-hat every 2 iterations after the burn-in; `NaN` for the constant `η*_B` columns |
 | `t_convergence` | scalar | iteration of the stop, or `maxIterations` |
 
 The structure `info` has:
@@ -83,7 +83,7 @@ The figures use the utilities `daviolinplot.m` and `slanCM.m` included in `matla
 
 ### Sensitivity analysis
 
-`gsa/` computes **grouped first-order Sobol' indices** with the estimator of Sobol' and Myshetskaya (2008), on the posterior samples. The groups are: molar fractions,
+`gsa/` computes **grouped first-order Sobol' indices** with the estimator of [Sobol' and Myshetskaya (2008)](../References.md#sensitivity-analysis), on the posterior samples. The groups are: molar fractions,
 carbon numbers, topochemical indices.
 
 | Function | Property | Output |

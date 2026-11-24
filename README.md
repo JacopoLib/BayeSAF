@@ -93,7 +93,7 @@ The file formats and the units are in [`docs/Input-data.md`](docs/Input-data.md)
 The `docs/` folder describes both implementations in detail, starting from [`docs/README.md`](docs/README.md):
 
 * how to use the code: [Python quick start](docs/python/Quick-start.md) and [MATLAB quick start](docs/matlab/Quick-start.md), [input data](docs/Input-data.md), the configuration reference of [Python](docs/python/Configuration-reference.md) and of [MATLAB](docs/matlab/Configuration-reference.md);
-* what the code does: [parametrisation](docs/Notation-and-parametrisation.md), [Bayesian model](docs/Bayesian-model.md), [thermophysical models](docs/Thermophysical-models.md) and [sampler](docs/Sampler.md);
+* what the code does: [parametrisation](docs/Notation-and-parametrisation.md), [Bayesian model](docs/Bayesian-model.md), [thermophysical models](docs/Thermophysical-models.md), [sampler](docs/Sampler.md) and [references](docs/References.md);
 * [differences between the Python and MATLAB implementations](docs/Differences-Python-MATLAB.md).
 
 # Objectives

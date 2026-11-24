@@ -11,12 +11,12 @@ Seven values are returned (the type annotation in the source mentions eight).
 
 | Name | Shape | Content |
 |---|---|---|
-| `chain` | `(t_convergence, 3*Nc-1, n_cold)` | **physical** parameters of the cold chains, columns as in the layout. Rows after the iteration at which the run stopped are not included |
+| `chain` | `(t_convergence, 3*N_s-1, n_cold)` | **physical** parameters of the cold chains, columns as in the layout. Rows after the iteration at which the run stopped are not included |
 | `posterior_pdf` | `(t_convergence, n_cold)` | log-posterior of the corrected posterior (with the isomer correction) |
-| `chain_reshaped` | `(N_post * n_cold, 3*Nc-1)` | post-burn-in samples of all cold chains stacked |
+| `chain_reshaped` | `(N_post * n_cold, 3*N_s-1)` | post-burn-in samples of all cold chains stacked |
 | `posterior_reshaped` | `(N_post * n_cold,)` | corresponding log-posterior |
 | `AR` | `(t_convergence, n_cold)` | cumulative acceptance rate, in percent |
-| `R_hat` | `(n_checks, 3*Nc-1)` | R-hat history, one row every 2 iterations after the burn-in; `NaN` for constant-`eta` columns |
+| `R_hat` | `(n_checks, 3*N_s-1)` | R-hat history, one row every 2 iterations after the burn-in; `NaN` for constant-`η*_B` columns |
 | `t_convergence` | int | iteration of the stop, or `max_iterations` if not converged |
 
 The `info` dictionary has:
@@ -36,7 +36,7 @@ post-burn-in sample contains only the last iteration of each cold chain. Check `
 
 ## MAP surrogate
 
-`find_map(posterior_reshaped, chain_reshaped, Nc)` returns the **sample with the highest log-posterior**
+`find_map(posterior_reshaped, chain_reshaped, N_s)` returns the **sample with the highest log-posterior**
 (`argmax`) among the post-burn-in samples:
 
 - `x_MAP`: molar fractions (the last one is `1 - sum`),
@@ -46,7 +46,7 @@ post-burn-in sample contains only the last iteration of each cold chain. Check `
 It is the posterior mode as visited by the sampler. It is not a marginal mode and it is not a
 posterior mean.
 
-`write_map(families, Nc, x_MAP, nc_MAP, eta_B_star_MAP, fuel_name, output_file="MAP.txt", data_dir=None)`
+`write_map(families, N_s, x_MAP, nc_MAP, eta_B_star_MAP, fuel_name, output_file="MAP.txt", data_dir=None)`
 writes a text file and returns the species names. It finds each species with the same lookup used in the
 likelihood and computes the blend properties of the MAP mixture. `MAP.txt` contains:
 
@@ -64,7 +64,7 @@ likelihood and computes the blend properties of the MAP mixture. `MAP.txt` conta
 ## Pushforward distributions
 
 ```python
-pf = props_pushforward(full_data, families, classes, chain_reshaped, Nc, variable_names,
+pf = props_pushforward(full_data, families, classes, chain_reshaped, N_s, variable_names,
                        x_MAP, nc_MAP, eta_B_star_MAP, min_T_array, max_T_array,
                        pressure_distillation, confidence_width=0.9)
 ```
@@ -84,7 +84,7 @@ and `sobol_idx`. The Sobol' indices (next section) are computed inside this func
 
 ## Global sensitivity analysis
 
-`gsa/` computes **grouped first-order Sobol' indices** with the estimator of Sobol' and Myshetskaya (2008),
+`gsa/` computes **grouped first-order Sobol' indices** with the estimator of [Sobol' and Myshetskaya (2008)](../References.md#sensitivity-analysis),
 using the posterior samples as the input distribution. The three groups are:
 
 1. molar fractions,

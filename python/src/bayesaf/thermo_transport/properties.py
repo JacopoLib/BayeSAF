@@ -263,7 +263,22 @@ def mixture_property(
         mu = mixture_property("mu", T, X_all, classes, index_n_eta_all, pressure)
         return mu / rho
 
-    elif prop in ("kappa", "specificHeat", "latentHeat", "vaporPressure"):
+    elif prop == "kappa":
+        # Li's method: k_mix = sum_i sum_j psi_i psi_j K_ij, with the superficial
+        # volume fractions psi_i = X_i W_i / rho_i (normalised) and
+        # K_ij = 2 / (1/k_i + 1/k_j)
+        k_mat = np.zeros((N_samples, N_exp, Nc))
+        v_mat = np.zeros((N_samples, N_exp, Nc))
+        for i in range(Nc):
+            for j in range(N_samples):
+                sp = classes[i][index_n_eta_all[j, i]]
+                k_mat[j, :, i] = _liquid_property_cached("kappa", T, sp, pressure)
+                v_mat[j, :, i] = X_full[j, i] * sp.mol_weight / _liquid_property_cached("rho", T, sp, pressure)
+        psi = v_mat / v_mat.sum(axis=2, keepdims=True)
+        K_ij = 2.0 / (1.0 / k_mat[:, :, :, None] + 1.0 / k_mat[:, :, None, :])
+        return (psi[:, :, :, None] * psi[:, :, None, :] * K_ij).sum(axis=(2, 3))
+
+    elif prop in ("specificHeat", "latentHeat", "vaporPressure"):
         # mass-weighted average
         numerator = np.zeros((N_samples, N_exp, Nc))
         denominator = np.zeros((N_samples, Nc))

@@ -20,6 +20,8 @@ Implemented in `thermo_transport/properties.py`, `distillation/flash.py` and
 
 ## Pure-species correlations (Yaws)
 
+The correlations and their coefficients are those of the Yaws' handbook ([Yaws 2003](References.md#thermophysical-and-mixing-models)); where the handbook has no coefficients, they were fitted to experimental data or to machine-learning predictions (see [Input data](Input-data.md#what-the-database-contains)).
+
 `liquid_property(prop, T, sp, pressure=101325.0)` returns the liquid-phase property of one species.
 `T` can be a scalar or an array. Coefficients come from the species database. `W` is the molecular
 weight [g/mol] and `Tc` the critical temperature [K].
@@ -53,14 +55,19 @@ and pressure. This matters because the same species is evaluated thousands of ti
 | `rho` | `sum(X_i W_i) / sum(X_i W_i / rho_i)` (ideal mixing of volumes) |
 | `mu` | logarithmic: `exp(sum X_i ln mu_i)` |
 | `nu` | `mu_mix / rho_mix` |
-| `kappa`, `specificHeat`, `latentHeat`, `vaporPressure` | **mass-weighted** average: `sum(X_i W_i prop_i) / sum(X_i W_i)` |
+| `kappa` | Li's method: `sum_i sum_j ψ_i ψ_j K_ij`, with the superficial volume fractions `ψ_i = X_i W_i / rho_i` (normalised to 1) and `K_ij = 2 / (1/k_i + 1/k_j)` |
+| `specificHeat`, `latentHeat`, `vaporPressure` | **mass-weighted** average: `sum(X_i W_i prop_i) / sum(X_i W_i)` |
 | `sigma` | **mole-fraction** average: `sum(X_i sigma_i)` |
+
+The logarithmic viscosity rule, Li's method for the thermal conductivity and the mole-fraction average of the surface tension follow [Poling et al. (2001)](References.md#thermophysical-and-mixing-models).
 
 Note that `vaporPressure` of the mixture is a mass-weighted average of the pure-species values. It
 is not the Raoult's-law sum. The distillation curve does not use this property: it uses the
 pure-species vapour pressures directly in the flash equation.
 
 ## Flash equation
+
+The distillation curve is obtained from a sequence of flash problems solved with the Rachford-Rice equation ([Rachford and Rice 1952](References.md#thermophysical-and-mixing-models); [Elliott and Lira 2012](References.md#thermophysical-and-mixing-models)). In the notation of the paper the vapour fraction is `β` (`β_f` for the recovered fractions of the targets); `beta` is the same quantity in the code.
 
 `flash_residual(T, beta, classes, index_n_eta, X, pressure)` returns the Rachford-Rice residual
 
@@ -109,6 +116,14 @@ as the recovered volume reaches `vol1`; the remaining entries of `T_distillation
 cheap likelihood. The volume axis of this version is `arange(101)`, i.e. a nominal grid, with the
 accumulated volume being checked against `vol1` at each step.
 
+## Validation against ASTM D86 data
+
+The flash-distillation model has been validated against experimental ASTM D86 distillation curves: two binary mixtures (50 % n-pentane / 50 % n-heptane and 50 % n-decane / 50 % n-tetradecane by moles; [Ferris and Rothamer 2016](References.md#thermophysical-and-mixing-models)) and hydrocarbon-based surrogate mixtures ([Bruno and Smith 2010](References.md#thermophysical-and-mixing-models)). The comparison is shown in Fig. 8 of [Liberatori et al. (2026)](References.md#statistical-model-and-the-paper), reproduced below.
+
+![Flash distillation compared with ASTM D86 curves](img/flash-validation.png)
+
+*Validation of the flash-distillation model against experimental ASTM D86 curves: (a) binary mixtures, (b) surrogate mixtures. Figure 8 of Liberatori et al. (2026).*
+
 ## Batch evaluation and worker pool
 
 `distillation_curve_batch(X_all, classes, index_n_eta, pressure)` evaluates the curves of many samples
@@ -154,5 +169,5 @@ because the pool may use the `spawn` start method (macOS, Windows).
 - **Parallelism.** `DistillationCurve_speed` evaluates one curve per sample with `parfor`; it needs (and starts, if absent)
   a parallel pool. No compiled acceleration is used.
 - **Mixture properties.** `ThermophysicalProperties_LiquidMixture_speed(property, T, X_all, classes, index_n_eta_all, pressure)`
-  returns an array `N_samples x N_T`. Mixing rules: ideal volume (`rho`), logarithmic (`mu`), `nu = mu/rho`, mass-weighted
-  (`kappa`, `specificHeat`, `latentHeat`, `vaporPressure`) and mole-fraction-weighted (`sigma`).
+  returns an array `N_samples x N_T`. Mixing rules: ideal volume (`rho`), logarithmic (`mu`), `nu = mu/rho`, Li's method
+  (`kappa`), mass-weighted (`specificHeat`, `latentHeat`, `vaporPressure`) and mole-fraction-weighted (`sigma`).

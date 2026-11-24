@@ -13,7 +13,7 @@ On the first run MATLAB starts a parallel pool. A waitbar shows the iterations o
 |---|---|
 | Paths | `addpath` of the code, of the database and of the data of the fuel |
 | Real fuel data | `Dataset`, `fuel_name`, `Tbubble_realFuel` |
-| Inputs of the inference | `numComponents`, `families`, `n_ranges`, bounds on `eta` and on the molar fractions; `classes{i} = Hydrocarbons(families{i}, n_ranges{i})` |
+| Inputs of the inference | `numComponents`, `families`, `n_ranges`, bounds on `η*_B` and on the molar fractions; `classes{i} = Hydrocarbons(families{i}, n_ranges{i})` |
 | Import of the data | `p_distillation`, `data_import` |
 | Posterior | `pdf_build_speed` (full) and `pdf_build_speed_cheap` (first distillation point only; `deltaT_dist` is removed from its data) |
 | DE-MC | parameters and the call to `DifferentialEvolutionMarkovChain` |

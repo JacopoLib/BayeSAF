@@ -33,7 +33,7 @@ It writes `MAP.txt`, `demc_log.txt` and a `Figures/` directory in the current fo
 | Families | `nparaffins`, `isoparaffins`, `isoparaffins` |
 | Carbon ranges | C8-C15, C9-C12, C13-C16 |
 | Molar-fraction bounds | 0.1 to 0.75 for each component |
-| Chains | `2*(3*Nc-1) = 16` |
+| Chains | `2*(3*N_s-1) = 16` |
 | Maximum iterations | 20000 |
 | Burn-in | 500 |
 | Bubble temperature | 445 K |
@@ -58,4 +58,4 @@ at the last check and the minimum effective sample size (with a warning if it is
 1. Create `exp/<FUEL>/` with one CSV per property ([Input data](../Input-data.md)).
 2. Change `DATASET`, `DATA_DIR`, `FUEL_NAME` and `T_BUBBLE`.
 3. Choose `NUM_COMPONENTS`, `FAMILIES` and `N_RANGES`, then adjust bounds and `N_CHAINS`
-   (the example uses `2*(3*Nc-1)`).
+   (the example uses `2*(3*N_s-1)`).

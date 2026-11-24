@@ -38,7 +38,7 @@ database/<family>/ ──> Hydrocarbons ─────────────�
 | Function | Purpose |
 |---|---|
 | `prob = dirichlet_pdf(x, alpha, LowerBound, UpperBound)` | log prior of the molar fractions |
-| `prob = uniform_pdf(x, LowerBound, UpperBound)` | log prior of `eta` |
+| `prob = uniform_pdf(x, LowerBound, UpperBound)` | log prior of `η*_B` |
 | `prob = discrete_uniform(n, n_ranges)` | log prior of the carbon numbers |
 | `L = LikelihoodFunction_speed(families, classes, data, stdData, X_all, n_all, eta_B_star_all, variable, pressure)` | log-likelihood of one property |
 | `L = LikelihoodFunction_speed_cheap(...)` | same, one distillation point |
@@ -76,7 +76,7 @@ Local functions of the same file: `isomer_tables`, `isomer_prior`, `decode_compo
 | `[fullData, minT_array, maxT_array, variable_names] = data_import(Dataset, families, n_ranges, Tbubble_realFuel, numComponents, pressure_distillation)` | reads the targets ([Input data](../Input-data.md)) |
 | `pressure_distillation = p_distillation(Dataset)` | distillation pressure |
 | `T_threshold = threshold_temperature(families, n_ranges, Tbubble_realFuel, numComponents, pressure_distillation)` | temperature filter |
-| `row_idx = findIndex_eta(class, nC, eta_B_star)` | species index from `(n_C, eta)` |
+| `row_idx = findIndex_eta(class, nC, eta_B_star)` | species index from `(n_C, η*_B)` |
 | `Yi = mol2mass(Xi, Wi)`, `Wavg = molWeight(Xi, Wi)` | composition arithmetic |
 | `posterior_val = posterior_handle(x, n, eta_B_star)` | loads a saved posterior handle from `posterior_handle.mat` (which must be on the path) and evaluates it |
 | `h = daviolinplot(...)`, `colorList = slanCM(type, num)` | plotting utilities (violin plots, colour maps) used by the figures |

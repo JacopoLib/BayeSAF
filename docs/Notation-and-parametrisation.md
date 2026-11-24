@@ -20,31 +20,42 @@ implemented in `python/src/bayesaf/mcmc/layout.py`, `utilities/find_index.py` an
 
 | Symbol | Meaning | Code |
 |---|---|---|
-| `Nc` | number of surrogate components | `NUM_COMPONENTS`, `num_components` |
-| `x_j` | molar fraction of component `j` (`j = 1..Nc`), with `x_Nc = 1 - sum(x_j)` | `X_all`, `x_MAP` |
+| `N_s` | number of surrogate components | `NUM_COMPONENTS`, `num_components` |
+| `𝓗 = [H_1, ..., H_{N_s}]` | hydrocarbon family of each component | `FAMILIES` |
+| `X_j` | molar fraction of component `j` (`j = 1..N_s`), with `X_{N_s} = 1 - sum(X_j)`; only the first `N_s - 1` are inferred | `X_all`, `x_MAP` |
 | `n_C,j` | number of carbon atoms of component `j` | `n_all`, `nc_MAP` |
-| `eta_j` | normalised topochemical atom index for branching of component `j` | `eta_B_star_all`, `eta_B_star_MAP` |
-| `lambda` | the vector of inferred parameters | one row of `chain_reshaped` |
-| species `(j, n_C, eta)` | one entry of the species list of component `j` | `Species` |
+| `η*_B,j` | normalised topochemical atom index for branching of component `j`: it identifies the isomer | `eta_B_star_all`, `eta_B_star_MAP` |
+| `λ` | the vector of inferred parameters, `[X; n_C; η*_B]` | one row of `chain_reshaped` |
+| species `(j, n_C, η*_B)` | one entry of the species list of component `j` | `Species` |
+| `z_d`, `s_i` | target property values (measured or prescribed) and their standard deviations | files of `exp/<FUEL>/` |
+| `𝒯`, `β_f` | thermodynamic states of the temperature-dependent targets, and recovered fractions of the distillation targets | temperature and volume columns of the data files |
+| `g_mix` | forward model: species database and mixing rules | `mixture_property`, `distillation_curve`, ... |
+| `π(λ)`, `𝓛_G(z_d ∣ λ)`, `𝒫(λ ∣ z_d)` | prior, Gaussian likelihood, posterior | `prior_fn`, `likelihood_fn`, `posterior_fn` |
+| `x_i`, `β` | liquid mole fraction and vapour fraction in the flash problem; `x = X` at the start of the distillation | [Thermophysical models](Thermophysical-models.md) |
+| `ϑ` | inverse temperature of a chain in the parallel-tempering ladder | `beta` in the sampler ([Sampler](Sampler.md)) |
 
-`eta` in the sampler and in the output is always `eta_B_star_norm` (the normalised value read from
-the database). The un-normalised `eta_B_star` is used only inside the decoder (see below).
+The symbols follow the paper ([Liberatori et al. (2026)](References.md#statistical-model-and-the-paper)). Two things differ in the code:
+
+- the array called `X` in the sampler holds the **normalised** state in `[0, 1]`; the molar fractions are in `phys`;
+- `eta_B_star_norm` (`η*_B`) is the value used by the sampler and written to the output. The un-normalised
+  `eta_B_star` is the branching index `BI` of the paper (`BI = η_B V_W`, see [Input data](Input-data.md#what-the-database-contains)),
+  used only inside the decoder (see below).
 
 ## The inferred vector
 
 ```math
-\lambda = [\,x_1,\dots,x_{N_c-1};\; n_{C,1},\dots,n_{C,N_c};\; \eta_1,\dots,\eta_{N_c}\,]
+\lambda = [\,X_1,\dots,X_{N_s-1};\; n_{C,1},\dots,n_{C,N_s};\; \eta^*_{B,1},\dots,\eta^*_{B,N_s}\,]
 ```
 
-It has `3*Nc - 1` entries. The column order is fixed by `SurrogateLayout`:
+It has `3*N_s - 1` entries. The column order is fixed by `SurrogateLayout`:
 
 | Columns | Content |
 |---|---|
-| `0 .. Nc-2` | molar fractions (the last one is `1 - sum`) |
-| `Nc-1 .. 2Nc-2` | carbon numbers |
-| `2Nc-1 .. 3Nc-2` | normalised topochemical indices |
+| `0 .. N_s-2` | molar fractions (the last one is `1 - sum`) |
+| `N_s-1 .. 2N_s-2` | carbon numbers |
+| `2N_s-1 .. 3N_s-2` | normalised topochemical indices |
 
-For component `j`, `(n_C, eta)` identifies one species of the family `FAMILIES[j]`. The pair is
+For component `j`, `(n_C, η*_B)` identifies one species of the family `FAMILIES[j]`. The pair is
 mapped to a row of the database by `find_index_eta`: keep the species with the requested `n_C`,
 then take the one whose `eta_B_star_norm` is closest to the requested value.
 
@@ -68,7 +79,7 @@ The DE-MC proposals are made in a state vector `X` with all entries in `[0, 1]`.
 stored in the chain. The decoding rules are:
 
 **Molar fractions.** `phys_j = X_j * (upper_j - lower_j) + lower_j`, with the bounds
-`LOWER_MOL_FRAC` and `UPPER_MOL_FRAC`. Only the first `Nc - 1` fractions are in the state vector.
+`LOWER_MOL_FRAC` and `UPPER_MOL_FRAC`. Only the first `N_s - 1` fractions are in the state vector.
 
 **Carbon number.** With `K` distinct carbon numbers available in the species list of the component
 (`sorted({sp.nC})`), `u` in `[0, 1]` is mapped to the index `min(floor(u*K), K-1)`. Each carbon
@@ -77,7 +88,7 @@ number therefore has the same width `1/K` in `u`.
 > The list of carbon numbers is taken from the species list, not from `N_RANGES`. If the database has no
 > species for some `n` in `N_RANGES`, that `n` is not reachable.
 
-**Isomer (`eta`).** Let `N` be the number of species in the whole list of the component (all carbon
+**Isomer (`η*_B`).** Let `N` be the number of species in the whole list of the component (all carbon
 numbers) and let `eta_sorted` be their `eta_B_star` values (un-normalised) sorted in increasing order.
 For `u` in `[0, 1]`:
 
@@ -101,6 +112,10 @@ computes these cells exactly. They are used for two things:
 Species whose cell has zero measure are **unreachable**: no `u` decodes to them. They are excluded
 from the candidates and have `-inf` posterior.
 
+![Decoded isomer index as a function of the proposal coordinate u, for n_C = 13 and n_C = 16](img/decoder-cells.png)
+
+*Decoder of the isomer index for the iso-paraffin component of the 992-species database (`isoparaffins`, `n_C` from 7 to 20), at two carbon numbers. Each step is one isomer; the number next to a step is the measure of its cell. The widths are unequal, so the isomers are not equally probable under a uniform proposal; the prior correction of the [Bayesian model](Bayesian-model.md#isomer-prior-correction-in-the-sampler) compensates for it.*
+
 ## Boundary handling
 
 Proposals can leave `[0, 1]`.
@@ -116,26 +131,26 @@ Proposals can leave `[0, 1]`.
 
 `SurrogateLayout.init_population`:
 
-1. Draw `Dirichlet(1)` vectors (via `-log(U)` normalised) in batches, and keep those whose `Nc`
+1. Draw `Dirichlet(1)` vectors (via `-log(U)` normalised) in batches, and keep those whose `N_s`
    molar fractions lie inside the bounds. The target is `10 * N_chains` valid samples.
-2. Normalise the first `Nc - 1` fractions to `[0, 1]` and draw the `2*Nc` coordinates of `n_C` and
-   `eta` uniformly.
+2. Normalise the first `N_s - 1` fractions to `[0, 1]` and draw the `2*N_s` coordinates of `n_C` and
+   `η*_B` uniformly.
 3. Decode and evaluate the posterior on all samples. Candidates with a non-finite log-posterior
-   (for example `eta` outside `LOWER_ETA`/`UPPER_ETA`) are discarded and the draw is repeated until
+   (for example `η*_B` outside `LOWER_ETA`/`UPPER_ETA`) are discarded and the draw is repeated until
    `10 * N_chains` finite candidates are available (error after 100 rounds). Then select `N_chains`
    points by a greedy max-min distance rule in physical space (first point random, then the point
    farthest from the selected ones).
 4. Shuffle the order.
 
 The initial population always uses a uniform Dirichlet, whatever `ALPHA_DIRICHLET` is. The initial
-molar fractions are also required to satisfy the bounds on all `Nc` fractions. The `eta` coordinate
-is drawn uniformly on [0, 1] regardless of the `eta` bounds; the bounds act through the prior, so the
+molar fractions are also required to satisfy the bounds on all `N_s` fractions. The `η*_B` coordinate
+is drawn uniformly on [0, 1] regardless of the `η*_B` bounds; the bounds act through the prior, so the
 finite-posterior filter above is what keeps the initial states inside them.
 
-## Constant-`eta` families
+## Families with a constant isomer index
 
 If every species of a family has the same `eta_B_star_norm` (for instance `nparaffins`, with one
-isomer per carbon number), the `eta` column of that component is constant. It is excluded from the
+isomer per carbon number), the `η*_B` column of that component is constant. It is excluded from the
 R-hat test (`rhat_skip`) and appears as `NaN` in `R_hat`.
 
 ## MATLAB implementation: notes
@@ -151,8 +166,8 @@ R-hat test (`rhat_skip`) and appears as `NaN` in `R_hat`.
   numbers present in the loaded species list. The two coincide when every number in `n_ranges{k}` has at least one
   species in the database. If one does not, `Hydrocarbons` stops with an explicit error (`The database has no species of the family ... with ... carbon atoms`),
   where Python simply cannot reach that number.
-- **Index base.** All column indices below are 1-based in MATLAB: the molar fractions are columns `1..Nc-1`
-  (`cols_x`), the carbon numbers `Nc..2Nc-1` (`cols_nc`), the topochemical indices `2Nc..3Nc-1` (`cols_eta`).
+- **Index base.** All column indices below are 1-based in MATLAB: the molar fractions are columns `1..N_s-1`
+  (`cols_x`), the carbon numbers `N_s..2N_s-1` (`cols_nc`), the topochemical indices `2N_s..3N_s-1` (`cols_eta`).
 - **Initial population.** Same procedure as in Python: Dirichlet(1) within the bounds, uniform coordinates for the rest,
   candidates with a non-finite log-posterior discarded, greedy max-min distance selection with `pdist2`, random permutation.
 - **Family keys.** `Hydrocarbons.m` accepts `nparaffins`, `isoparaffins`, `cycloparaffins`, `dicycloparaffins`,

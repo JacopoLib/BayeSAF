@@ -26,13 +26,44 @@ Each directory contains three semicolon-separated CSV files:
 | `<family>_Names.csv` | `Name; eta_B_star; eta_B_star_norm`, row-aligned with the data file |
 | `<family>_SMILES.csv` | SMILES of each species |
 
+### What the database contains
+
+The database has 992 species of seven hydrocarbon families, up to 20 carbon atoms:
+
+| Family | Species | `n_C` range |
+|---|---|---|
+| n-paraffins (`nparaffins`) | 14 | 7-20 |
+| iso-paraffins (`isoparaffins`) | 684 | 7-20 |
+| monocycloparaffins (`cycloparaffins`) | 134 | 6-12 |
+| dicycloparaffins (`dicycloparaffins`) | 18 | 10-15 |
+| alkylbenzenes (`alkylbenzenes`) | 36 | 6-10 |
+| alkylnaphthalenes (`alkylnaphthalenes`) | 94 | 10-15 |
+| cycloaromatics (`cycloaromatics`) | 12 | 9-15 |
+
+![Number of species by family and carbon number](img/database-families.png)
+
+The iso-paraffins carry most of the isomeric information: there are 354 isomers at `n_C = 12`, and from
+`n_C = 13` on five (six at `n_C = 16`) per carbon number. Isomers of the same carbon number differ
+noticeably in several properties:
+
+![Isomeric variability of the C12 iso-paraffins](img/isomer-variability-c12.png)
+
+*Spread of ten properties over the 354 C12 iso-paraffins of the database, relative to the median. The temperature-dependent
+properties are computed from the Yaws coefficients of the database at the temperatures shown. Freezing and flash points are in kelvin.*
+
+**Branching index.** `eta_B_star` is the product of the topochemical atom index for branching `η_B` ([Roy and Ghosh 2004](References.md#database-and-topochemical-index); computed with PaDEL, [Yap 2011](References.md#database-and-topochemical-index)) and the molecular (van der Waals) volume `V_W` of a conformer (RDKit, [Bento et al. 2020](References.md#database-and-topochemical-index)). The isomeric effects were studied with this index by [Hall et al. (2024)](References.md#database-and-topochemical-index). The normalised value is `η*_B = (BI - BI_min) / (BI_max - BI_min)`, with the extremes taken over the species of the same family with the same `n_C`. Families with one species per carbon number (n-paraffins) have a constant `η*_B`.
+
+**Provenance of the values.** For every species the files give 11 bulk properties (`W`, `Tc`, `Pc`, `Vc`, `rhoc`, `Zc`, `omega`, `Tf`, `Tfz`, `Hc`, `DCN`) and the Yaws coefficients of the seven temperature-dependent properties. The values come from the Yaws' handbook ([Yaws 2003](References.md#thermophysical-and-mixing-models)) and from other experimental references where available. Missing values were predicted with descriptors-based machine-learning models (elastic net, LASSO, gradient boosting, support vector regression, random forest or multi-layer perceptron; see [Liberatori et al. 2026](References.md#statistical-model-and-the-paper), Sec. 2.1, and [Freitas and Jiang 2024](References.md#database-and-topochemical-index) for the approach). The derived cetane numbers are taken from [Murphy et al. (2004)](References.md#database-and-topochemical-index) where available and otherwise predicted by a Gaussian-process model trained on those data.
+
+**Annotated tables.** Each family directory also contains `<family>.xlsx`, a table of the same values with the definition of every column, the formulas of the Yaws' correlations and the reference of each value. **Values predicted by machine learning are written in red**; the other values are experimental or taken from the references listed in the file. The code reads only the CSV files.
+
 ### Columns of `<family>_MatlabData.csv`
 
 | Column | Meaning |
 |---|---|
 | `nC` | number of carbon atoms |
-| `eta_B_star` | topochemical atom index for branching |
-| `eta_B_star_norm` | normalised index |
+| `eta_B_star` | branching index `BI = η_B V_W` of the paper (topochemical atom index for branching times molecular volume) |
+| `eta_B_star_norm` | `η*_B`: `eta_B_star` normalised to `[0, 1]` among the species of the same family and the same `n_C` |
 | `W` | molecular weight [g/mol] |
 | `Tc`, `Pc`, `Vc`, `rhoc`, `Zc`, `omega` | critical temperature [K], pressure, molar volume, density, compressibility factor, acentric factor |
 | `Tf` | flash point [K] |

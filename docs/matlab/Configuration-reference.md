@@ -34,7 +34,7 @@ The 29 arguments are **positional**; the order is the one in the table.
 | 4 | `classes` | species of each component | |
 | 5, 6 | `LowerBound_x`, `UpperBound_x` | bounds of the molar fractions | |
 | 7 | `n_ranges` | carbon numbers of each component | |
-| 8, 9 | `LowerBound_eta_B_star`, `UpperBound_eta_B_star` | bounds of `eta` (not used by the sampler; they act through the prior in the posterior handles) | |
+| 8, 9 | `LowerBound_eta_B_star`, `UpperBound_eta_B_star` | bounds of `η*_B` (not used by the sampler; they act through the prior in the posterior handles) | |
 | 10 | `maxIterations` | hard stop per chain | 20000 |
 | 11 | `t_burnin` | length of the tempered phase of the burn-in; the real burn-in is at least `2*t_burnin` | 500 |
 | 12 | `scaling_factor_X` | jump scaling, molar fractions | 0.1 |

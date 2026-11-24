@@ -5,7 +5,7 @@
 > | Concept | Python (`python/src/bayesaf/pdfs/`) | MATLAB (`matlab/pdfs/`) |
 > |---|---|---|
 > | Dirichlet prior | `log_dirichlet` | `dirichlet_pdf.m` |
-> | Isomer prior (`eta`) | `log_uniform` | `uniform_pdf.m` |
+> | Isomer prior (`η*_B`) | `log_uniform` | `uniform_pdf.m` |
 > | Carbon-number prior | `log_discrete_uniform` | `discrete_uniform.m` |
 > | Isomer correction | `_uniform_isomer_prior` in `mcmc/demc.py` | `isomer_prior`, `isomer_tables` in `DifferentialEvolutionMarkovChain.m` |
 > | Likelihood of one property | `log_likelihood` | `LikelihoodFunction_speed.m` |
@@ -18,13 +18,15 @@
 Prior, likelihood and posterior as implemented in `pdfs/distributions.py`, `pdfs/pdf_build.py`
 and `pdfs/likelihood.py`. All densities are handled in log scale and vectorised over samples:
 every callable has the signature `fn(X_all, N_all, Eta_all) -> ndarray(N_samples,)`, with
-`X_all` of shape `(N, Nc-1)`, and `N_all`, `Eta_all` of shape `(N, Nc)`.
+`X_all` of shape `(N, N_s-1)`, and `N_all`, `Eta_all` of shape `(N, N_s)`.
 
 ## Posterior
 
 ```math
-\log p(\lambda \mid \mathcal{D}) = \log p(\lambda) + \sum_{k \in \text{properties}} \log L_k(\lambda) + \text{const}
+\log \mathcal{P}(\lambda \mid z_d) = \log \pi(\lambda) + \sum_{k \in \text{properties}} \log \mathcal{L}_{G,k}(z_{d,k} \mid \lambda) + \text{const}
 ```
+
+with `z_d` the target values (measured or prescribed), `π` the prior and `𝓛_G` the Gaussian likelihood of each property (symbols as in [Notation](Notation-and-parametrisation.md#notation)).
 
 `build_pdfs(...)` returns `(prior_fn, likelihood_fn, posterior_fn)`. The likelihood is the sum of
 one handle per property in `DATASET`.
@@ -39,14 +41,14 @@ one handle per property in `DATASET`.
 \log p(x) = \log\Gamma\Big(\sum_j \alpha_j\Big) - \sum_j \log\Gamma(\alpha_j) + \sum_j (\alpha_j - 1)\log x_j
 ```
 
-evaluated on the full vector `[x_1..x_{Nc-1}, 1 - sum]`. It returns `-inf` if any fraction is
+evaluated on the full vector `[x_1..x_{N_s-1}, 1 - sum]`. It returns `-inf` if any fraction is
 outside `[lower_j, upper_j]`. The density is **not** renormalised for the truncation, so with
 tight bounds its value is a constant offset that does not affect the sampling.
 
 **Carbon number: discrete uniform.** `log_discrete_uniform(n, n_ranges)` is `-log(prod_j |range_j|)`
 if every `n_j` is in the corresponding `N_RANGES` entry, `-inf` otherwise.
 
-**Isomer index: continuous uniform.** `log_uniform(eta, lower, upper)` is `-sum_j log(upper_j - lower_j)`
+**Isomer index: continuous uniform.** `log_uniform(x, lower, upper)`, applied to the `η*_B` values, is `-sum_j log(upper_j - lower_j)`
 inside the bounds, `-inf` outside. With the default bounds `[0, 1]` it is a constant. Narrower
 bounds exclude species whose `eta_B_star_norm` falls outside them.
 
@@ -68,11 +70,11 @@ posterior.
 
 ## Likelihood
 
-`log_likelihood(...)` evaluates, for one property, a Gaussian likelihood of the measurements
-`d_i` with standard deviations `s_i` given the model value `phi_i(lambda)`:
+`log_likelihood(...)` evaluates, for one property, a Gaussian likelihood ([Sargsyan et al. 2015](References.md#statistical-model-and-the-paper)) of the measurements
+`z_{d,i}` with standard deviations `s_i` given the model value `g_mix(λ)`:
 
 ```math
-\log L = -\tfrac{1}{2} \sum_i \Big[\log(2\pi s_i^2) + \frac{(\phi_i - d_i)^2}{s_i^2}\Big]
+\log \mathcal{L}_G = -\tfrac{1}{2} \sum_i \Big[\log(2\pi s_i^2) + \frac{\big(g_{mix}(\mathcal{T}_i;\beta_{f,i};\mathcal{H},\lambda) - z_{d,i}\big)^2}{s_i^2}\Big]
 ```
 
 (`_gaussian_log_likelihood`). The measurements are treated as independent: there is no model-error
@@ -81,21 +83,21 @@ term and no correlation between points. The standard deviations are taken from t
 
 The per-property model values are:
 
-| `variable` | Model value `phi` |
+| `variable` | Model value `g_mix` |
 |---|---|
 | `molWeight` | `sum_j x_j W_j` |
-| `HC` | atomic H/C ratio from the family formulas ([below](#hc-ratio)) |
-| `DCN` | volume-weighted average of the component DCN |
-| `LHV` | mass-weighted average of `Hc` |
-| `flash` | blending index method of ASTM D-7215 on component flash points |
-| `freezing` | volume-weighted blend of `Tfz^(1/0.05)`, raised to `0.05` |
+| `HC` | atomic H/C ratio from the family formulas (below) |
+| `DCN` | volume-weighted average of the component DCN ([Murphy et al. 2004](References.md#database-and-topochemical-index)) |
+| `LHV` | mass-weighted average of `Hc` ([Kim et al. 2014](References.md#thermophysical-and-mixing-models)) |
+| `flash` | blending index method of ASTM D-7215 on component flash points ([Gary and Handwerk 2001](References.md#thermophysical-and-mixing-models)) |
+| `freezing` | volume-weighted blend of `Tfz^(1/0.05)`, raised to `0.05` ([Hu and Burns 1970; Riazi 2005](References.md#thermophysical-and-mixing-models)) |
 | `distillation` | temperature of the computed distillation curve at the measured recovered volume |
 | `deltaT_dist` | `T50 - T10` (code `5010`) or `T90 - T10` (code `9010`) of the computed curve |
 | `rho`, `mu`, `nu`, `kappa`, `specificHeat`, `latentHeat`, `vaporPressure`, `sigma` | mixture property at the measured temperatures ([Thermophysical models](Thermophysical-models.md)) |
 
 Details:
 
-- **Index lookup.** For every sample and component, the species is found with `find_index_eta(classes[j], nC, eta)`.
+- **Index lookup.** For every sample and component, the species is found with `find_index_eta(classes[j], nC, eta_B_star)`.
 - **HC ratio.** Hydrogen atoms per molecule are `2n+2` (n- and isoparaffins), `2n` (cycloparaffins),
   `2n-2` (dicycloparaffins), `2n-6` (alkylbenzenes), `2n-12` (alkylnaphthalenes), `2n-8` (cycloaromatics),
   averaged with the molar fractions. The mean carbon number is rounded to 2 decimals and the ratio to

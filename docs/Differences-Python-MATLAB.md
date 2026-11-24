@@ -28,7 +28,7 @@ The two implementations follow the same method and the same sequence of operatio
 
 ## What is the same
 
-- the parametrisation `(x, n_C, eta)`, the decoding and the folding at the boundaries;
+- the parametrisation `(x, n_C, η*_B)`, the decoding and the folding at the boundaries;
 - the prior, the isomer correction and the Gaussian likelihood, with the same mixing rules and units;
 - the distillation curve algorithm in 100 flash steps and the cheap variant;
 - the two-stage delayed acceptance, the three-phase burn-in with tempering and outlier resets, the production ladder, the snooker and Gibbs moves, the swap rules;

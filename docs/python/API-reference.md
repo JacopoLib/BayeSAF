@@ -45,7 +45,7 @@ Details: [Thermophysical models](../Thermophysical-models.md).
 | Function | Purpose |
 |---|---|
 | `log_dirichlet(x, alpha, lower_bound, upper_bound)` | prior of the molar fractions |
-| `log_uniform(x, lower_bound, upper_bound)` | prior of `eta` |
+| `log_uniform(x, lower_bound, upper_bound)` | prior of `η*_B` |
 | `log_discrete_uniform(n, n_ranges)` | prior of the carbon numbers |
 | `log_likelihood(families, classes, data, std_data, X_all, n_all, eta_B_star_all, variable, pressure)` | Gaussian log-likelihood of one property |
 | `log_likelihood_cheap(...)` | same, with the first-point distillation |
@@ -90,5 +90,5 @@ Details: [Post-processing and outputs](Postprocessing.md).
 | `data_import(dataset, families, n_ranges, Tbubble_real_fuel, num_components, pressure_distillation, data_dir=None)` | read the targets ([Input data](../Input-data.md)) |
 | `p_distillation(dataset, data_dir=None)` | distillation pressure from the data |
 | `threshold_temperature(families, n_ranges, Tbubble_real_fuel, num_components, pressure_distillation)` | temperature filter |
-| `find_index_eta(species_list, nC, eta_B_star)` | species index from `(n_C, eta)` |
+| `find_index_eta(species_list, nC, eta_B_star)` | species index from `(n_C, η*_B)` |
 | `mol_weight(xi, wi)`, `mol_to_mass(xi, wi)` | composition arithmetic |

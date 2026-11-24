@@ -17,27 +17,27 @@ Every parameter of the CHRJ example (`python/examples/CHRJ_3comp/example_hefa.py
 
 | Name | Meaning | Example |
 |---|---|---|
-| `NUM_COMPONENTS` | number of components `Nc` | 3 |
+| `NUM_COMPONENTS` | number of components `N_s` | 3 |
 | `FAMILIES` | family of each component (see [Input data](../Input-data.md#species-database-database)) | `nparaffins, isoparaffins, isoparaffins` |
 | `N_RANGES` | carbon numbers of each component | C8-C15, C9-C12, C13-C16 |
 | `LOWER_ETA`, `UPPER_ETA` | bounds on `eta_B_star_norm`; act only in the prior | 0, 1 |
 | `LOWER_MOL_FRAC`, `UPPER_MOL_FRAC` | bounds on each molar fraction, including the last | 0.1, 0.75 |
-| `ALPHA_DIRICHLET` | Dirichlet concentration of the prior | `ones(Nc)` |
+| `ALPHA_DIRICHLET` | Dirichlet concentration of the prior | `ones(N_s)` |
 
 `N_RANGES` is used to load the species (`load_hydrocarbons`) and in the discrete-uniform prior. The sampler takes the
 carbon numbers it can reach from the loaded species lists, not from `N_RANGES` directly.
 The `n_ranges`, `lower_bound_eta` and `upper_bound_eta` arguments of `run_demc` are accepted for
-compatibility with the MATLAB signature but the standard layout does not use them; the bounds on `eta`
+compatibility with the MATLAB signature but the standard layout does not use them; the bounds on `η*_B`
 take effect only through the prior in `build_pdfs`.
 
 ## Chains
 
 | Name (`run_demc` argument) | Meaning | Default | Example |
 |---|---|---|---|
-| `N_CHAINS` (`N_chains`) | number of chains; at least 8 | required | `2*(3*Nc-1)` = 16 |
+| `N_CHAINS` (`N_chains`) | number of chains; at least 8 | required | `2*(3*N_s-1)` = 16 |
 | `MAX_ITERATIONS` (`max_iterations`) | hard stop, per chain | required | 20000 |
 | `SEED` (`seed`) | random seed | 1234 | 42 |
-| `x_init` | normalised initial population, shape `(N_chains, 3*Nc-1)`; bypasses the random initialisation | `None` | not used |
+| `x_init` | normalised initial population, shape `(N_chains, 3*N_s-1)`; bypasses the random initialisation | `None` | not used |
 | `layout` | `ParameterLayout`; `None` builds `SurrogateLayout` | `None` | not used |
 | `log_file` | text log of the run; `None` disables it | `"MCMC.txt"` | `demc_log.txt` |
 | `info` | dict filled with run information | `None` | `{}` |
@@ -86,7 +86,7 @@ take effect only through the prior in `build_pdfs`.
 
 ## Choosing values
 
-- **Chains.** The example uses `2*(3*Nc-1)` chains, half cold and half hot after the burn-in. For `Nc = 3` this is 16.
+- **Chains.** The example uses `2*(3*N_s-1)` chains, half cold and half hot after the burn-in. For `N_s = 3` this is 16.
 - **Iterations.** The run stops early when the convergence criterion is met, so `MAX_ITERATIONS` is a ceiling. Increase it first if
   the run reports no convergence.
 - **Cost.** Per iteration, the cost is dominated by distillation curves of the proposals that pass stage 1. A smaller
