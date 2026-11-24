@@ -34,7 +34,7 @@ The two implementations follow the same method and the same sequence of operatio
 - the two-stage delayed acceptance, the three-phase burn-in with tempering and outlier resets, the production ladder, the snooker and Gibbs moves, the swap rules;
 - the stopping rule (R-hat only) and the effective sample size as a diagnostic;
 - the MAP (highest log-posterior sample), the 25-point temperature grids and the percentile bands, the grouped Sobol' indices;
-- the family keys (`alkylnaphthalenes`), the detection of the property from the name of the data file (first match, error if none) and the treatment of flash points at or below 0 degF (`-Inf` likelihood, `NaN` in `MAP.txt`).
+- the family keys, the detection of the property from the name of the data file (first match, error if none) and the treatment of flash points at or below 0 degF (`-Inf` likelihood, `NaN` in `MAP.txt`).
 
 ## Practical consequences
 
