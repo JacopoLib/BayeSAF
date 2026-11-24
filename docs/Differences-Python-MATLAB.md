@@ -10,6 +10,7 @@ The two implementations follow the same method and the same sequence of operatio
 | Sampler arguments | keyword arguments with defaults | 29 positional arguments, then optional name-value pairs with the same defaults |
 | Seed | argument `seed` (default 1234) | name-value `'Seed'` (default 1234) |
 | Random numbers | `RandomState` (MT19937) with a ziggurat built to follow MATLAB's `randn` stream | `rng(Seed, 'twister')` (default 1234), workers seeded `Seed + spmdIndex` if a pool exists |
+| Extension points (`layout`, `crossover_every`, `block_proposals`, `aux_moves`, `de_skip_units`, checkpoints) | available in `run_demc` | not available |
 | Gibbs move | enumeration of all candidates (`gibbs_tries=None`) or multiple-try | multiple-try only; `gibbs_tries` required |
 | `scaling_factor_nc` | scalar or array | scalar |
 | Log file | argument `log_file` (default `MCMC.txt`; the example uses `demc_log.txt`) | name-value `'LogFile'` (default `MCMC.txt`) |

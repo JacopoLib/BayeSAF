@@ -58,9 +58,7 @@ from scipy.spatial.distance import cdist
 from bayesaf.thermo_transport.hydrocarbons import Species
 
 
-# ---------------------------------------------------------------------------
 # Parameter encoding/decoding
-# ---------------------------------------------------------------------------
 
 def _decode_nc(u: float, n_range: list[int]) -> int:
     """Map normalised u ∈ [0,1] to a discrete carbon count."""
@@ -114,9 +112,7 @@ def _triangle_fold(x: float) -> float:
     return 1.0 - abs(1.0 - (x % 2))
 
 
-# ---------------------------------------------------------------------------
 # Composition unit and proposal blocks
-# ---------------------------------------------------------------------------
 
 @dataclass
 class CompositionUnit:
@@ -139,7 +135,7 @@ class CompositionUnit:
     def Nc(self) -> int:
         return len(self.nc_cols)
 
-    # -- decoder cells: measure of {u : decode(u) = isomer} ---------------------
+    # decoder cells: measure of {u : decode(u) = isomer}
 
     def eta_cells(self, k: int, nC: int) -> dict:
         """Decoder cells of the isomers of component k with nC carbon atoms.
@@ -273,25 +269,35 @@ class CompositionUnit:
 class Block:
     """A group of columns updated together by one DE proposal."""
 
-    kind: str          # "fractions", "nC" or "eta"
-    unit: int          # index into layout.units
+    kind: str          # "fractions", "nC", "eta" or "continuous"
+    unit: int          # index into layout.units (-1 for "continuous" blocks)
     cols: np.ndarray
 
 
-# ---------------------------------------------------------------------------
 # Layouts
-# ---------------------------------------------------------------------------
 
 class ParameterLayout:
     """Base class: units, blocks and the posterior-argument convention.
 
     Subclasses must set ``units``, ``blocks`` and ``n_params`` and implement
-    ``posterior_args`` and ``init_population``.
+    ``posterior_args`` and ``init_population``. A layout with "continuous"
+    blocks must also implement ``decode_continuous``. ``gibbs_units`` lists the
+    units on which the Gibbs move of (nC, eta) acts, and ``uniform_isomer_prior``
+    says whether the sampler adds the uniform-isomer prior correction.
     """
 
     units: list[CompositionUnit]
     blocks: list[Block]
     n_params: int
+    uniform_isomer_prior: bool = True
+
+    @property
+    def gibbs_units(self) -> list[int]:
+        return list(range(len(self.units)))
+
+    def decode_continuous(self, block: Block, Xp_row: np.ndarray, phys_row: np.ndarray) -> None:
+        """Fold and decode the columns of a "continuous" block in place."""
+        raise NotImplementedError
 
     def posterior_args(self, phys_rows: np.ndarray) -> tuple:
         """Arguments passed to the posterior callables for a batch of rows."""

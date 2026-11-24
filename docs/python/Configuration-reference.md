@@ -77,6 +77,21 @@ take effect only through the prior in `build_pdfs`.
 | `RHAT_MIN_SAMPLES` (`rhat_min_samples`) | minimum post-burn-in iterations | 2000 | 2000 |
 | `ESS_MIN` (`ess_min`) | **diagnostic only**: a warning is written in the log if the minimum bulk ESS of the molar fractions is below it; it does not affect the stopping | 400 | 400 |
 
+## Extension points of `run_demc`
+
+These arguments serve layouts other than the standard one (for example the hierarchical model of the `bayesaf-hierarchical` repository). They have no effect with the standard layout and are not exposed in the example.
+
+| Name | Meaning | Default |
+|---|---|---|
+| `layout` | `ParameterLayout` describing the state vector (units, blocks, posterior arguments) | standard `SurrogateLayout` |
+| `scaling_factor_cont`, `noise_cont` | jump scale and noise of the `"continuous"` blocks of a layout | 1.0, 1e-6 |
+| `crossover_every` | iterations between exchanges of one block of coordinates between two chains of the same temperature group (layouts with `crossover_blocks`) | `None` (off) |
+| `block_proposals`, `p_block_proposal`, `block_proposal_rounds` | independence proposals of whole blocks drawn from an object with `blocks`, `sample` and `logq`; probability per chain and round; rounds per iteration | `None`, 0.0, 1 |
+| `aux_moves` | object with `step(X, phys, p_X, beta, rng, adapt)`, called once per iteration after the other moves | `None` |
+| `de_skip_units` | units whose discrete blocks the DE move never draws | `None` |
+| `checkpoint_every`, `checkpoint_path` | write a pickle of the cold chains every that many iterations | `None` (off) |
+| `burnin_resets` | if `False`, the chains below the others are not reset during the burn-in, which ends at `2*t_burnin` | `True` |
+
 ## Post-processing
 
 | Name | Meaning | Example |

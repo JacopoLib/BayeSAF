@@ -210,6 +210,10 @@ on exactly the returned samples. The values go to `info["ESS"]` (a dictionary co
 (default 400), a warning is added to the log. It does not influence when the run stops. Discrete parameters
 (`n_C`, `η*_B`) are not included. It is not computed if the burn-in did not end.
 
+## Extension points
+
+The state vector is described by a `ParameterLayout` (`mcmc/layout.py`): a list of composition units, a list of blocks (`"fractions"`, `"nC"`, `"eta"` or `"continuous"`) and the arguments passed to the posterior. The standard layout has one unit. A layout with several units, or with continuous blocks, can be sampled with the same moves: the DE move draws one block per proposal, the Gibbs move acts on the units listed in `layout.gibbs_units`, and the molar fractions of a unit are folded and decoded by the unit itself. Optional hooks add moves that are exact for the tempered target: exchange of a block between two chains (`crossover_every`), independence proposals of a block (`block_proposals`) and arbitrary moves applied once per iteration (`aux_moves`). The arguments are listed in the [Configuration reference](python/Configuration-reference.md#extension-points-of-run_demc). With the standard layout and the default values the sampler is unchanged.
+
 ## Return values
 
 See [Post-processing and outputs](python/Postprocessing.md#return-values-of-run_demc).

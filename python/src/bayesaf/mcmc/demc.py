@@ -119,28 +119,19 @@ Outputs:
 from __future__ import annotations
 
 import functools
-import sys
 from typing import Callable, Sequence
 
 import numpy as np
 
 from bayesaf.thermo_transport.hydrocarbons import Species
 from bayesaf.distillation.distillation_curve import init_pool, shutdown_pool
-from bayesaf.mcmc.layout import (  # noqa: F401  (decoders re-exported for compatibility)
-    ParameterLayout,
-    SurrogateLayout,
-    _decode_eta,
-    _decode_nc,
-    _triangle_fold,
-)
+from bayesaf.mcmc.layout import ParameterLayout, SurrogateLayout
 
 # Type alias for vectorised posterior callable
 PostFn = Callable[[np.ndarray, np.ndarray, np.ndarray], np.ndarray]
 
 
-# ---------------------------------------------------------------------------
 # Marsaglia-Tsang (2000) normal ziggurat — matches MATLAB's randn(MT19937)
-# ---------------------------------------------------------------------------
 # Reference: G. Marsaglia & W.W. Tsang, "The Ziggurat Method for Generating
 #   Random Variables", J. Stat. Software 5(8), 2000.
 # Parameters (N=128 strips, r=3.442619855899, v=9.91256303526217e-3) are
@@ -205,7 +196,7 @@ def _mt_randn(rng: np.random.RandomState) -> float:
         if abs(hz) < int(_ZIGG_KN[iz]):
             return hz * _ZIGG_WN[iz]   # fast path (~97.5 %)
 
-        # ── Slow path ─────────────────────────────────────────────────────
+        # Slow path
         if iz == 0:
             # Tail sampling (x > r): exponential with rate 1/r
             while True:
@@ -226,9 +217,7 @@ def _mt_randn_vec(rng: np.random.RandomState, n: int) -> np.ndarray:
     return np.array([_mt_randn(rng) for _ in range(n)], dtype=np.float64)
 
 
-# ---------------------------------------------------------------------------
 # Convergence diagnostics
-# ---------------------------------------------------------------------------
 
 def _r_hat_classic(chains: np.ndarray, t_burnin: int, t: int) -> np.ndarray:
     """Classic Gelman-Rubin R-hat (plain chain means) over the second half of [t_burnin, t]."""
@@ -267,9 +256,7 @@ def _ess_bulk(draws: np.ndarray) -> float:
     return float(m * n / max(tau, 1.0 / np.log10(m * n)))
 
 
-# ---------------------------------------------------------------------------
 # Prior over isomers
-# ---------------------------------------------------------------------------
 
 def _uniform_isomer_prior(layout, posterior_fn, posterior_cheap_fn):
     """Posteriors with a uniform prior over the isomers of each component given
@@ -297,10 +284,7 @@ def _uniform_isomer_prior(layout, posterior_fn, posterior_cheap_fn):
         return g
     return wrap(posterior_fn), wrap(posterior_cheap_fn)
 
-
-# ---------------------------------------------------------------------------
 # Main DE-MC function
-# ---------------------------------------------------------------------------
 
 def _run_demc(
     families: list[str],
@@ -343,6 +327,17 @@ def _run_demc(
     rhat_spacing: int = 500,
     rhat_min_samples: int = 2000,
     ess_min: float = 400,
+    scaling_factor_cont: float = 1.0,
+    noise_cont: float = 1e-6,
+    crossover_every: int | None = None,
+    block_proposals=None,
+    p_block_proposal: float = 0.0,
+    block_proposal_rounds: int = 1,
+    aux_moves=None,
+    de_skip_units=None,
+    checkpoint_every: int | None = None,
+    checkpoint_path: str | None = None,
+    burnin_resets: bool = True,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
     """
     Run the DE-MC algorithm with delayed acceptance and parallel tempering.
@@ -375,6 +370,36 @@ def _run_demc(
         size (Vehtari et al., 2021) of every molar fraction is computed on the
         returned samples and stored in info; a warning is written in the log
         if the minimum is below ess_min.
+    scaling_factor_cont, noise_cont : jump scale and noise of the "continuous"
+        blocks of a layout (for example the hyperparameters of a hierarchical
+        layout). The standard layout has none.
+    crossover_every : every that many iterations, for layouts exposing
+        ``crossover_blocks``, two chains of the same temperature group swap one
+        block of coordinates. The swap is accepted with probability
+        min(1, exp(sum_k beta_k [log pi(x_k') - log pi(x_k)])), a Metropolis move
+        on the product of the tempered targets (the crossover of evolutionary
+        Monte Carlo, Liang and Wong 2000). None disables it.
+    block_proposals, p_block_proposal, block_proposal_rounds : an object with
+        ``blocks`` (a list of column arrays), ``sample(b, rng)`` returning
+        (u_block, phys_block) or None, and ``logq(b, u_block, phys_block)`` (log
+        proposal density in the normalised coordinates). In each of
+        ``block_proposal_rounds`` rounds per iteration every chain, with
+        probability ``p_block_proposal``, proposes one random block from it
+        (independence Metropolis-Hastings, exact at any temperature).
+    aux_moves : an object with ``step(X, phys, p_X, beta, rng, adapt)``, called
+        once per iteration after the other moves. It updates the states in place
+        with moves exact for the tempered targets; ``adapt`` is True during the
+        burn-in. If it has a ``rates()`` method, the rates go to
+        ``info["aux_move_rates"]``.
+    de_skip_units : units whose discrete blocks ("nC" and "eta") the DE move
+        never draws; those coordinates are then moved by the Gibbs move, the
+        block proposals and ``aux_moves`` only.
+    checkpoint_every, checkpoint_path : write every that many iterations a
+        pickle with the cold chains so far (``chain``, ``posterior_pdf``, ``t``,
+        ``t_burnin``, ``burnin_done``) and the acceptance rates. The file is
+        replaced atomically; the run is not affected.
+    burnin_resets : if False, the chains below the others are not reset during
+        the burn-in, which then ends at 2*t_burnin.
 
     Returns
     -------
@@ -404,8 +429,11 @@ def _run_demc(
     rng = np.random.RandomState(seed)  # MT19937 — matches MATLAB rng(seed,'twister')
     if layout is None:
         layout = SurrogateLayout(classes, n_ranges, lower_bound_x, upper_bound_x)
-    posterior_fn, posterior_cheap_fn = _uniform_isomer_prior(layout, posterior_fn, posterior_cheap_fn)
+    if layout.uniform_isomer_prior:
+        posterior_fn, posterior_cheap_fn = _uniform_isomer_prior(layout, posterior_fn, posterior_cheap_fn)
     n_params = layout.n_params
+    gibbs_units = layout.gibbs_units
+    has_cont = any(b.kind == "continuous" for b in layout.blocks)
 
     # Start a persistent worker pool.  Passing *classes* to the initializer
     # pre-loads the species database in each worker so it is not re-pickled
@@ -442,7 +470,7 @@ def _run_demc(
     if fid is not None:
         fid.write(_hdr)
 
-    # ── Preallocate ─────────────────────────────────────────────────────────
+    # Preallocate
     # phys_chain stores physical values (molar fractions, nC, eta_B_star_norm)
     # with the column layout of `layout`; x_archive stores normalised states
     # for the snooker jump.
@@ -455,13 +483,12 @@ def _run_demc(
     _ess_cols = sorted(int(c) for u in layout.units for c in u.frac_cols)
     x_archive = np.zeros((max_iterations, n_params, N_chains))
 
-    # ── Initialise population ───────────────────────────────────────────────
+    # Initialise population
     if x_init is not None:
         # External initial states (benchmark mode) — bypass random sampling.
         X, phys, p_X = layout.decode_init(x_init, posterior_fn)
     else:
         X, phys, p_X = layout.init_population(N_chains, posterior_fn, rng)
-    # p_X is a 1-D array (N_chains,)
 
     t = 0  # 0-based index
     phys_chain[t] = phys.T
@@ -485,6 +512,13 @@ def _run_demc(
     swap_try = np.zeros(n_hot)
     swap_acc = np.zeros(n_hot)
 
+    skip = set(de_skip_units or ())
+    de_blocks = [b for b in layout.blocks if not (b.kind in ("nC", "eta") and b.unit in skip)]
+    cross_blocks = list(getattr(layout, "crossover_blocks", [])) if crossover_every else []
+    cross_try = cross_acc = 0
+    bp_blocks = list(block_proposals.blocks) if block_proposals is not None else []
+    bp_try = bp_acc = 0
+
     # Temperature ladder during the burn-in
     if T_ladder == "linear":
         beta_arr = np.linspace(1.0, beta_min, N_chains)
@@ -503,16 +537,8 @@ def _run_demc(
     every = outlier_every or max(50, t_burnin // 4)
     margin_best = 5.0 * np.sqrt(n_params / 2.0)
 
-    # ── R-hat skip mask ───────────────────────────────────────────────────────
-    # Parameters whose value is structurally constant across all chains
-    # (e.g. eta for n-paraffins, which have exactly one isomer per nC) will
-    # always have W=0, producing NaN R-hat.  We identify them once here so we
-    # can:
-    #   • store NaN in R_hat (shows as a gap in the diagnostic plot)
-    #   • treat them as trivially converged in the convergence test
-    #
-    # A parameter is constant if all species in that family share a single
-    # distinct eta_B_star_norm value (regardless of nC).
+    # Parameters that are constant in every chain (eta of the n-paraffins, one isomer per nC)
+    # give W = 0: they are stored as NaN in R_hat and count as converged.
     _rhat_skip = layout.rhat_skip()
 
     if fid is not None and _rhat_skip.any():
@@ -521,7 +547,7 @@ def _run_demc(
             f"R-hat skipped (constant eta) for families: {skipped}\n"
         )
 
-    # ── Main loop ────────────────────────────────────────────────────────────
+    # Main loop
     for _iter in range(1, max_iterations):
         t = _iter
 
@@ -546,16 +572,18 @@ def _run_demc(
         log_pi1_y_vec = np.zeros(N_chains)
         stage1_override = np.full(N_chains, np.nan)   # Gibbs move: log alpha1
 
-        # ── Per-chain proposal ─────────────────────────────────────────────
+        # Per-chain proposal
         for i in range(N_chains):
             r_gibbs = rng.random_sample()
 
             Xp_temp = Xp[i].copy()
             phys_temp = phys[i].copy()
 
-            # ── Gibbs move on one component's (nC, eta) ───────────────────
+            # Gibbs move on one component's (nC, eta)
             if r_gibbs <= p_gibbs:
-                unit = layout.units[0]
+                g_unit = (gibbs_units[0] if len(gibbs_units) == 1
+                          else gibbs_units[rng.randint(0, len(gibbs_units))])
+                unit = layout.units[g_unit]
                 k = rng.randint(0, unit.Nc)
                 cn, ce = unit.nc_cols[k], unit.eta_cols[k]
                 cx = posterior_cheap_fn(*layout.posterior_args(phys[i:i + 1]))[0]
@@ -638,12 +666,10 @@ def _run_demc(
                 phys_new[i] = phys_temp
                 continue
 
-            # Choose block
-            block = layout.blocks[rng.randint(0, len(layout.blocks))]
-            unit = layout.units[block.unit]
-            Nc = unit.Nc
+            block = de_blocks[rng.randint(0, len(de_blocks))]
+            unit = None if block.kind == "continuous" else layout.units[block.unit]
+            Nc = (unit if unit is not None else layout.units[0]).Nc
 
-            # Scaling factors and jump partner indices
             # MATLAB: D = randsample(1:n_pairs, 1, 'true');
             D = int(rng.randint(1, n_pairs + 1))
 
@@ -676,8 +702,11 @@ def _run_demc(
 
             g_eta = gamma_eta if rng.random_sample() < 0.9 else 1.0
 
+            if has_cont:
+                gamma_cont = scaling_factor_cont * 2.38 / np.sqrt(2 * D * len(block.cols))
+                g_cont = gamma_cont if rng.random_sample() < 0.9 else 1.0
 
-            # ── Snooker-jump pre-computation ───────────────────────────────
+            # Snooker-jump pre-computation
             # Active only for the fractions block, after burn-in and after a
             # warm-up of 10*n_params steps (mirrors the MATLAB condition).
             r_move = rng.random_sample()
@@ -769,17 +798,27 @@ def _run_demc(
                         + noise_eta * _mt_randn(rng)
                         )
 
+            elif block.kind == "continuous":
+                for j in cols:
+                    de_diff = np.sum(X[a_idx, j] - X[b_idx, j], axis=0)
+                    Xp_temp[j] = (
+                        X[i, j]
+                        + (1 - lambda_vec[i]) * g_cont * de_diff
+                        + noise_cont * _mt_randn(rng)
+                    )
 
-            # ── Boundary handling ──────────────────────────────────────────
-            unit.fold_fractions(Xp_temp, phys_temp)
-            if block.kind in ("nC", "eta"):
-                # Continuous-to-discrete mapping with triangle-fold
-                unit.decode_discrete(Xp_temp, phys_temp)
+            # Boundary handling
+            if unit is not None:
+                unit.fold_fractions(Xp_temp, phys_temp)
+                if block.kind in ("nC", "eta"):
+                    unit.decode_discrete(Xp_temp, phys_temp)
+            else:
+                layout.decode_continuous(block, Xp_temp, phys_temp)
 
             Xp[i] = Xp_temp
             phys_new[i] = phys_temp
 
-        # ── Delayed-acceptance ─────────────────────────────────────────────
+        # Delayed-acceptance
         log_alpha1 = beta_arr * (log_pi1_y_vec - log_pi1_x_vec) + J
         exact_rows = ~np.isnan(stage1_override)
         log_alpha1[exact_rows] = stage1_override[exact_rows]
@@ -809,7 +848,7 @@ def _run_demc(
 
         AR[t] = 100.0 * accept_arr[t] / t
 
-        # ── Parallel tempering swaps ───────────────────────────────────────
+        # Parallel tempering swaps
         if swap_freq_eff <= max_iterations and (t % swap_freq_eff) == 0:
             swap_idx_int = t // swap_freq_eff
             pair_start = 0 if (swap_idx_int % 2 == 0) else 1
@@ -823,7 +862,7 @@ def _run_demc(
                     # phys_chain) always matches p_x.
                     phys[[k, k + 1]] = phys[[k + 1, k]]
 
-        # ── Parallel tempering swaps after the burn-in ─────────────────────
+        # Parallel tempering swaps after the burn-in
         if in_prod and (t % swap_every_sampling) == 0:
             start = (t // swap_every_sampling) % 2
             for lev in range(start, n_hot, 2):
@@ -837,11 +876,56 @@ def _run_demc(
                     phys[[i_s, j_s]] = phys[[j_s, i_s]]
                     swap_acc[lev] += 1
 
-        # ── Outlier detection during burn-in ──────────────────────────────
+        if cross_blocks and (t % crossover_every) == 0:
+            pools = groups if in_prod else [np.arange(N_chains)]
+            for cols in cross_blocks:
+                pool = pools[rng.randint(0, len(pools))]
+                i_c, j_c = pool[rng.permutation(len(pool))[:2]]
+                Xc, Pc = X[[i_c, j_c]].copy(), phys[[i_c, j_c]].copy()
+                Xc[:, cols], Pc[:, cols] = Xc[::-1][:, cols], Pc[::-1][:, cols]
+                p_c = posterior_fn(*layout.posterior_args(Pc))
+                Delta = (beta_arr[i_c] * (p_c[0] - p_X[i_c])
+                         + beta_arr[j_c] * (p_c[1] - p_X[j_c]))
+                cross_try += 1
+                if Delta >= 0 or np.log(rng.random_sample()) < Delta:
+                    X[[i_c, j_c]], phys[[i_c, j_c]] = Xc, Pc
+                    p_X[[i_c, j_c]] = p_c
+                    cross_acc += 1
+
+        for _round in range(block_proposal_rounds if block_proposals is not None and p_block_proposal > 0.0 else 0):
+            n_bp = len(bp_blocks)
+            who, cand_u, cand_p, blk = [], [], [], []
+            for i in range(N_chains):
+                if rng.random_sample() >= p_block_proposal:
+                    continue
+                b = int(rng.randint(n_bp))
+                prop = block_proposals.sample(b, rng)
+                bp_try += 1
+                if prop is None:
+                    continue
+                Xc, Pc = X[i].copy(), phys[i].copy()
+                Xc[bp_blocks[b]], Pc[bp_blocks[b]] = prop
+                who.append(i); cand_u.append(Xc); cand_p.append(Pc); blk.append(b)
+            if who:
+                p_c = posterior_fn(*layout.posterior_args(np.array(cand_p)))
+                for n, i in enumerate(who):
+                    cols = bp_blocks[blk[n]]
+                    log_a = (beta_arr[i] * (p_c[n] - p_X[i])
+                             + block_proposals.logq(blk[n], X[i, cols], phys[i, cols])
+                             - block_proposals.logq(blk[n], cand_u[n][cols], cand_p[n][cols]))
+                    if np.isfinite(log_a) and np.log(rng.random_sample()) < log_a:
+                        X[i], phys[i], p_X[i] = cand_u[n], cand_p[n], p_c[n]
+                        bp_acc += 1
+
+        if aux_moves is not None:
+            aux_moves.step(X, phys, p_X, beta_arr, rng, adapt=not burnin_done)
+
+        # Outlier detection during burn-in
         if not burnin_done and t > t_burnin and (t - t_burnin) % every == 0:
             omega = p_x[t - every:t].mean(axis=0)
             thr = omega.max() - margin_best
-            outliers = [j for j in range(N_chains) if omega[j] < thr]
+            outliers = ([j for j in range(N_chains) if omega[j] < thr]
+                        if burnin_resets else [])
             good = np.array([j for j in range(N_chains) if omega[j] >= thr])
             if outliers:
                 # Reset to good chains drawn at random
@@ -868,16 +952,31 @@ def _run_demc(
                 if fid is not None:
                     fid.write(f"WARNING: burn-in cap reached at t={t} with outlier chains still present.\n")
 
-        # ── Store current state ────────────────────────────────────────────
+        # Store current state
         phys_chain[t] = phys.T
         p_x[t] = p_X
 
         if t % 10 == 0:
             x_archive[t] = X.T
 
-        # ── R-hat convergence check ────────────────────────────────────────
-        # Parameters with structurally constant eta (e.g. n-paraffins): NaN in
-        # storage (gap in plot), trivially converged in the test.
+        if checkpoint_every and checkpoint_path and t % checkpoint_every == 0:
+            import os
+            import pickle
+            ck = dict(chain=phys_chain[:t + 1][:, :, :n_cold].astype(np.float32),
+                      posterior_pdf=p_x[:t + 1][:, :n_cold], t=t, t_burnin=t_burn, burnin_done=burnin_done,
+                      swap_rates=swap_acc / np.maximum(swap_try, 1), betas=beta_prod)
+            if cross_blocks:
+                ck["crossover_rate"] = cross_acc / max(cross_try, 1)
+            if block_proposals is not None:
+                ck["block_proposal_rate"] = bp_acc / max(bp_try, 1)
+            if aux_moves is not None and hasattr(aux_moves, "rates"):
+                ck["aux_move_rates"] = aux_moves.rates()
+            tmp = checkpoint_path + ".tmp"
+            with open(tmp, "wb") as fh:
+                pickle.dump(ck, fh)
+            os.replace(tmp, checkpoint_path)
+
+        # R-hat convergence check
         if burnin_done and t > t_burn and (t - t_burn) % 2 == 0:
             rc = _r_hat_classic(phys_chain[:, :, :n_cold], t_burn, t)
             rc[_rhat_skip] = np.nan
@@ -908,7 +1007,7 @@ def _run_demc(
 
     print()  # newline after progress
 
-    # ── Effective sample size (diagnostic, on the returned samples) ──────────
+    # Effective sample size (diagnostic, on the returned samples)
     ess_vals = None
     if burnin_done and t_convergence - t_burn >= 4:
         win = phys_chain[t_burn:t_convergence, :, :n_cold]
@@ -930,7 +1029,7 @@ def _run_demc(
 
     shutdown_pool()
 
-    # ── Trim arrays to t_convergence ─────────────────────────────────────
+    # Trim arrays to t_convergence
     tc = t_convergence
     keep = np.arange(n_cold)
     x_chain = phys_chain[:tc][:, :, keep]
@@ -939,7 +1038,7 @@ def _run_demc(
     AR = AR[:tc][:, keep]
     R_hat = R_hat[:counter_check]
 
-    # ── Post-burnin samples ───────────────────────────────────────────────
+    # Post-burnin samples
     if not burnin_done:
         t_burn = tc - 1
     chain_reshaped = np.vstack(
@@ -953,6 +1052,12 @@ def _run_demc(
         info["n_resets"] = n_resets
         info["swap_rates"] = swap_acc / np.maximum(swap_try, 1)
         info["betas"] = beta_prod
+        if cross_blocks:
+            info["crossover_rate"] = cross_acc / max(cross_try, 1)
+        if block_proposals is not None:
+            info["block_proposal_rate"] = bp_acc / max(bp_try, 1)
+        if aux_moves is not None and hasattr(aux_moves, "rates"):
+            info["aux_move_rates"] = aux_moves.rates()
 
     return (
         x_chain,
