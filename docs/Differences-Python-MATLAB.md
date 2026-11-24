@@ -1,7 +1,6 @@
 # Differences between the Python and MATLAB implementations
 
-The two implementations follow the same method and the same sequence of operations. This page lists where they differ, as found by reading the code of both.
-They are **not** bit-for-bit equivalent: different random number generators, solvers and tolerances give different chains for the same seed.
+The two implementations follow the same method and the same sequence of operations. This page lists where they differ, as they are **not** bit-for-bit equivalent: different random number generators, solvers and tolerances give different chains for the same seed.
 
 ## Summary
 
@@ -21,7 +20,6 @@ They are **not** bit-for-bit equivalent: different random number generators, sol
 | Where the data are found | `data_dir` argument (path) | MATLAB path (`addpath`); file names without extension |
 | Species database | `database/` located from the source file; editable install | folders of `database/` added to the path by the example |
 | `deltaT_dist` and the distillation cache | shares the curves with `distillation` through a cache created at every evaluation of the likelihood | shares them through a `persistent` cache that is valid only for the same batch |
-| Mono-/bis-substituted isoparaffins | removed | not present |
 | Plots | `visualize_results` | inside `props_pushforward` |
 | Pushforward and plots | two functions: `props_pushforward`, `visualize_results` | one function: `props_pushforward` |
 | Sobol' analysis | `seed` argument (default 0) | local stream with seed 0 (`props_pushforward` itself starts with `rng('default')`) |
